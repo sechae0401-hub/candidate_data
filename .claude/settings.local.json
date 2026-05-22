@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell($env:Path = \"C:\\\\Users\\\\Playdata\\\\.local\\\\bin;$env:Path\"; \\(Get-Command serena\\).Source 2>&1)",
+      "Bash(claude mcp *)",
+      "Bash(python3 _bmad/scripts/resolve_customization.py --skill \".claude/skills/bmad-create-epics-and-stories\" --key workflow)",
+      "Bash(python3 \"c:\\\\Users\\\\Playdata\\\\Desktop\\\\chaeseungeun\\\\12_사내교육\\\\01_바이브코딩 4주_26.05/_bmad/scripts/resolve_customization.py\" --skill \"c:\\\\Users\\\\Playdata\\\\Desktop\\\\chaeseungeun\\\\12_사내교육\\\\01_바이브코딩 4주_26.05\\\\.claude\\\\skills\\\\bmad-sprint-planning\" --key workflow)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:api.github.com)",
+      "Bash(curl -s \"https://raw.githubusercontent.com/itconnect-ai/harness-starter/main/CLAUDE.md\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/itconnect-ai/harness-starter/main/.claude/settings.json\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/itconnect-ai/harness-starter/main/README.md\")",
+      "Bash(git init *)",
+      "Bash(git add *)"
+    ]
+  }
+}

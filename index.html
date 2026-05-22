@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 오케스트레이션 과정 — 멀티 에이전트 특화 부트캠프</title>
+    <!-- Fonts: Pretendard -->
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM CDN -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'brand-navy': '#0A1628',
+                        'brand-navy-elevated': '#0F1D33',
+                        'brand-cyan': '#00D4FF',
+                        'brand-orange': '#FF6B35',
+                        'brand-orange-active': '#E55A28',
+                        'surface-canvas': '#FFFFFF',
+                        'surface-soft': '#F6F8FB',
+                        'surface-strong': '#E6EAF0',
+                        'surface-hairline': '#D8DCE3',
+                        'ink-strong': '#0A1628',
+                        'ink-body': '#1F2937',
+                        'ink-muted': '#5A6271',
+                        'ink-on-dark': '#FFFFFF',
+                        'ink-on-dark-muted': '#9CA8BC',
+                        'success': '#0E9F6E',
+                    },
+                    fontFamily: {
+                        sans: ['Pretendard', 'Inter', 'sans-serif'],
+                    },
+                    spacing: {
+                        'section': '120px',
+                        'section-mobile': '72px',
+                    }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer base {
+            body {
+                @apply font-sans text-ink-body bg-surface-canvas antialiased;
+            }
+            h1, h2, h3, h4 {
+                @apply text-ink-strong tracking-tight;
+            }
+        }
+        @layer components {
+            .btn-primary {
+                @apply inline-flex items-center justify-center px-7 py-4 bg-brand-orange text-white font-semibold rounded-[12px] transition-all active:bg-brand-orange-active active:scale-95 text-base;
+            }
+            .btn-secondary {
+                @apply inline-flex items-center justify-center px-7 py-4 border-[1.5px] border-ink-strong text-ink-strong font-semibold rounded-[12px] transition-all active:bg-black/5 active:scale-95 text-base;
+            }
+            .btn-secondary-on-dark {
+                @apply inline-flex items-center justify-center px-7 py-4 border-[1.5px] border-white text-white font-semibold rounded-[12px] transition-all active:bg-white/10 active:scale-95 text-base;
+            }
+            .section-padding {
+                @apply py-[72px] lg:py-[120px];
+            }
+            .container-custom {
+                @apply max-w-[1200px] mx-auto px-6 lg:px-6;
+            }
+            .card-base {
+                @apply bg-surface-canvas border border-surface-hairline rounded-[12px] p-7 lg:p-8;
+            }
+        }
+        /* Custom scrollbar for curriculum */
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // UI Components
+        const Icon = ({ name, size = 24, className = "" }) => {
+            const iconRef = useRef(null);
+            useEffect(() => {
+                if (window.lucide) {
+                    window.lucide.createIcons();
+                }
+            }, []);
+            return <i data-lucide={name} className={className} style={{ width: size, height: size }}></i>;
+        };
+
+        const Logo = () => (
+            <div className="flex items-center gap-2 font-bold text-xl tracking-tighter">
+                <div className="w-8 h-8 bg-brand-cyan rounded-lg flex items-center justify-center">
+                    <div className="w-4 h-4 bg-brand-navy rounded-sm"></div>
+                </div>
+                <span>AI ORCHESTRA</span>
+            </div>
+        );
+
+        // Header Component
+        const Header = () => {
+            const [scrolled, setScrolled] = useState(false);
+            useEffect(() => {
+                const handleScroll = () => setScrolled(window.scrollY > 20);
+                window.addEventListener('scroll', handleScroll);
+                return () => window.removeEventListener('scroll', handleScroll);
+            }, []);
+
+            return (
+                <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? 'bg-white/80 backdrop-blur-md border-b border-surface-hairline py-4' : 'bg-transparent py-6'}`}>
+                    <div className="container-custom flex items-center justify-between">
+                        <Logo />
+                        <nav className="hidden md:flex items-center gap-8 text-sm font-medium">
+                            <a href="#why" className="hover:text-brand-cyan transition-colors">왜 지금인가</a>
+                            <a href="#curriculum" className="hover:text-brand-cyan transition-colors">커리큘럼</a>
+                            <a href="#project" className="hover:text-brand-cyan transition-colors">프로젝트</a>
+                            <a href="#faq" className="hover:text-brand-cyan transition-colors">FAQ</a>
+                        </nav>
+                        <a href="#cta" className="btn-primary py-2 px-5 text-sm rounded-full">신청하기</a>
+                    </div>
+                </header>
+            );
+        };
+
+        // Hero Section
+        const HeroSection = () => {
+            return (
+                <section className="relative min-h-screen flex items-center bg-brand-navy text-white pt-20 overflow-hidden">
+                    {/* SVG Background Pattern */}
+                    <div className="absolute inset-0 opacity-20 pointer-events-none">
+                        <svg viewBox="0 0 1200 800" className="w-full h-full object-cover">
+                            <g stroke="#00D4FF" strokeWidth="1" fill="none">
+                                <circle cx="600" cy="400" r="300" strokeDasharray="10 10" />
+                                <circle cx="600" cy="400" r="150" strokeDasharray="5 5" />
+                                <line x1="600" y1="100" x2="600" y2="700" />
+                                <line x1="300" y1="400" x2="900" y2="400" />
+                            </g>
+                        </svg>
+                    </div>
+
+                    <div className="container-custom relative z-10 grid lg:grid-cols-2 gap-12 items-center">
+                        <div className="max-w-2xl">
+                            <div className="inline-block px-4 py-1 rounded-full border border-brand-cyan/30 bg-brand-cyan/10 text-brand-cyan text-sm font-semibold mb-6">
+                                국비지원 100% · 멀티 에이전트 특화
+                            </div>
+                            <h1 className="text-5xl lg:text-7xl font-bold leading-[1.15] mb-8">
+                                AI를 시키는 사람이 되는 6개월.
+                            </h1>
+                            <p className="text-xl lg:text-2xl text-ink-on-dark-muted leading-relaxed mb-10 max-w-xl">
+                                이제 AI 한 명으로는 부족합니다. <br/>
+                                멀티 에이전트 시스템을 직접 설계하고 부리는 차세대 설계자로 도약하세요.
+                            </p>
+                            <div className="flex flex-col sm:flex-row gap-4">
+                                <button className="btn-primary text-lg px-10">지금 신청하기</button>
+                                <button className="btn-secondary-on-dark text-lg px-10">나에게 맞는 과정 찾기</button>
+                            </div>
+                        </div>
+                        <div className="hidden lg:block relative">
+                            {/* Node Graph Mockup */}
+                            <div className="relative w-[500px] h-[500px]">
+                                <div className="absolute inset-0 bg-brand-cyan/20 blur-[100px] rounded-full"></div>
+                                <div className="relative border border-brand-cyan/30 rounded-full w-full h-full flex items-center justify-center">
+                                    <div className="w-24 h-24 bg-brand-navy border-2 border-brand-cyan rounded-full flex items-center justify-center animate-pulse">
+                                        <div className="w-4 h-4 bg-brand-cyan rounded-full"></div>
+                                    </div>
+                                    {/* Small Nodes */}
+                                    {[0, 60, 120, 180, 240, 300].map(deg => (
+                                        <div key={deg} 
+                                             className="absolute w-12 h-12 bg-brand-navy-elevated border border-white/50 rounded-full"
+                                             style={{ 
+                                                 transform: `rotate(${deg}deg) translate(200px) rotate(-${deg}deg)`
+                                             }}>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            );
+        };
+
+        // Why Now Section
+        const WhyNowSection = () => (
+            <section id="why" className="section-padding bg-surface-canvas">
+                <div className="container-custom">
+                    <div className="max-w-3xl mb-16">
+                        <h2 className="text-4xl lg:text-5xl font-bold mb-6">
+                            ChatGPT는 누구나 씁니다. <br/>그래서 부족합니다.
+                        </h2>
+                        <p className="text-xl text-ink-muted">
+                            단순 프롬프트 입력을 넘어 AI 에이전트 간의 협업을 설계하는 능력이 기업의 핵심 경쟁력이 되었습니다.
+                        </p>
+                    </div>
+                    <div className="grid md:grid-cols-3 gap-8">
+                        {[
+                            { label: "AI 채용 수요", value: "320%", desc: "작년 대비 에이전트 설계 역량 요구 기업 증가" },
+                            { label: "직무 대체 가능성", value: "85%", desc: "단순 활용이 아닌 설계 역량 보유 시 생존 우위" },
+                            { label: "평균 연봉 인상", value: "+25%", desc: "AI 오케스트레이션 가능 시 기대 연봉 상승" }
+                        ].map((stat, idx) => (
+                            <div key={idx} className="card-base text-center">
+                                <div className="text-sm font-semibold text-ink-muted mb-2">{stat.label}</div>
+                                <div className="text-6xl font-bold text-brand-navy mb-4 tracking-tighter">{stat.value}</div>
+                                <div className="text-ink-muted">{stat.desc}</div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </section>
+        );
+
+        // Target Check Section
+        const TargetCheckSection = () => (
+            <section className="section-padding bg-surface-canvas border-t border-surface-hairline">
+                <div className="container-custom grid lg:grid-cols-2 gap-16 items-center">
+                    <div>
+                        <h2 className="text-4xl font-bold mb-8">이런 고민, 해보셨나요?</h2>
+                        <div className="space-y-4">
+                            {[
+                                "ChatGPT를 쓰긴 하는데 실질적인 업무 효율은 글쎄요..",
+                                "AI 에이전트, 멀티 에이전트 말은 듣는데 어떻게 만드는지 막막해요.",
+                                "비전공자인데 AI 설계자가 될 수 있을지 불안해요.",
+                                "단순한 활용을 넘어 AI를 '지휘'하는 역량을 갖고 싶어요."
+                            ].map((item, idx) => (
+                                <div key={idx} className="flex gap-4 items-start p-4 rounded-xl hover:bg-surface-soft transition-colors">
+                                    <div className="mt-1 text-success">
+                                        <Icon name="check-circle-2" size={20} />
+                                    </div>
+                                    <span className="text-lg font-medium">{item}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="bg-brand-navy p-10 rounded-[24px] text-white">
+                        <h3 className="text-2xl font-bold mb-6">망설여진다면?</h3>
+                        <p className="text-ink-on-dark-muted mb-8 leading-relaxed">
+                            본 과정은 비전공자도 AI의 기본 원리부터 멀티 에이전트 구현까지 단계별로 도달할 수 있도록 설계되었습니다.
+                        </p>
+                        <button className="btn-secondary-on-dark w-full">내 역량 진단받기</button>
+                    </div>
+                </div>
+            </section>
+        );
+
+        // Core Value Section
+        const CoreValueSection = () => (
+            <section className="section-padding bg-surface-soft">
+                <div className="container-custom">
+                    <h2 className="text-4xl font-bold mb-16 text-center">왜 이 과정인가</h2>
+                    <div className="grid md:grid-cols-3 gap-8">
+                        {[
+                            { title: "멀티 에이전트 특화", icon: "layers", desc: "국내 최초 오케스트레이션 중심 커리큘럼으로 희소성 있는 인재로 성장합니다." },
+                            { title: "현업 즉시 적용", icon: "zap", desc: "본인 직무 맥락에 맞춘 5회의 실전 프로젝트로 바로 활용 가능한 포트폴리오를 만듭니다." },
+                            { title: "국비지원 100%", icon: "gift", desc: "자비 부담 없이 6개월 동안 오프라인에서 몰입할 수 있는 최적의 환경을 제공합니다." }
+                        ].map((item, idx) => (
+                            <div key={idx} className="card-base">
+                                <div className="w-12 h-12 bg-brand-navy rounded-xl flex items-center justify-center text-brand-cyan mb-6">
+                                    <Icon name={item.icon} />
+                                </div>
+                                <h4 className="text-xl font-bold mb-4">{item.title}</h4>
+                                <p className="text-ink-muted leading-relaxed">{item.desc}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </section>
+        );
+
+        // Curriculum Section
+        const CurriculumSection = () => (
+            <section id="curriculum" className="section-padding bg-surface-canvas overflow-hidden">
+                <div className="container-custom">
+                    <h2 className="text-4xl font-bold mb-16">6개월, 이렇게 성장합니다</h2>
+                    <div className="relative">
+                        <div className="flex gap-6 overflow-x-auto hide-scrollbar snap-x pb-8">
+                            {[
+                                { month: "1 Month", title: "AI 기본 및 프롬프트 엔지니어링", desc: "대규모 언어 모델의 원리 이해 및 고급 기법 습득" },
+                                { month: "2 Month", title: "Python 기반 에이전트 설계", desc: "직접 코드로 구현하는 단일 에이전트 시스템" },
+                                { month: "3 Month", title: "멀티 에이전트 오케스트레이션", desc: "다수의 에이전트가 협업하는 워크플로우 설계" },
+                                { month: "4 Month", title: "RAG 및 벡터 DB 통합", desc: "외부 지식을 활용하는 지능형 에이전트 고도화" },
+                                { month: "5 Month", title: "실전 프로젝트 1: 직무 자동화", desc: "현업 이슈를 해결하는 개인형 포트폴리오 완성" },
+                                { month: "6 Month", title: "실전 프로젝트 2: 대형 시스템", desc: "복합 에이전트 서비스 배포 및 수료" }
+                            ].map((item, idx) => (
+                                <div key={idx} className="min-w-[300px] snap-start">
+                                    <div className="text-brand-cyan font-bold text-lg mb-4">{item.month}</div>
+                                    <div className="card-base min-h-[200px]">
+                                        <h4 className="font-bold mb-3">{item.title}</h4>
+                                        <p className="text-sm text-ink-muted">{item.desc}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-surface-canvas to-transparent pointer-events-none"></div>
+                    </div>
+                </div>
+            </section>
+        );
+
+        // Project Section
+        const ProjectSection = () => (
+            <section id="project" className="section-padding bg-surface-canvas">
+                <div className="container-custom">
+                    <h2 className="text-4xl font-bold mb-16 text-center">5번의 프로젝트, 5개의 포트폴리오</h2>
+                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                        {[1, 2, 3, 4, 5].map(num => (
+                            <div key={num} className="card-base group cursor-pointer hover:border-brand-cyan transition-colors">
+                                <div className="aspect-video bg-surface-soft rounded-lg mb-6 flex items-center justify-center text-ink-muted">
+                                    <Icon name="image" size={40} />
+                                </div>
+                                <h4 className="font-bold text-lg mb-2">실전 프로젝트 #{num}</h4>
+                                <p className="text-ink-muted text-sm mb-4">커리큘럼 단계에 맞춘 주제별 프로젝트가 진행됩니다.</p>
+                                <div className="flex items-center text-brand-cyan font-semibold text-sm group-hover:translate-x-1 transition-transform">
+                                    상세보기 <Icon name="chevron-right" size={16} />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </section>
+        );
+
+        // Instructor Section
+        const InstructorSection = () => (
+            <section className="section-padding bg-surface-soft">
+                <div className="container-custom text-center">
+                    <h2 className="text-4xl font-bold mb-8">AI를 써본 사람이 가르칩니다</h2>
+                    <p className="text-xl text-ink-muted mb-16 max-w-2xl mx-auto">
+                        현업에서 멀티 에이전트 시스템을 구축해본 전문가들이 밀착 지도합니다.
+                    </p>
+                    <div className="flex flex-wrap justify-center gap-12">
+                        {[1, 2, 3].map(i => (
+                            <div key={i} className="flex flex-col items-center">
+                                <div className="w-40 h-40 bg-surface-strong rounded-full mb-6 flex items-center justify-center text-ink-muted border-4 border-white">
+                                    <Icon name="user" size={60} />
+                                </div>
+                                <div className="font-bold text-xl mb-1">Coming Soon</div>
+                                <div className="text-ink-muted text-sm">현업 전문가 공개 예정</div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </section>
+        );
+
+        // Outcome Section
+        const OutcomeSection = () => (
+            <section className="section-padding bg-brand-navy text-white">
+                <div className="container-custom">
+                    <h2 className="text-4xl font-bold mb-16 text-center">수료 후, 당신의 이력서는 이렇게 바뀝니다</h2>
+                    <div className="grid lg:grid-cols-2 gap-12 items-stretch">
+                        <div className="p-8 rounded-2xl bg-white/5 border border-white/10 opacity-60">
+                            <h4 className="text-xl font-bold mb-6 text-ink-on-dark-muted">Before</h4>
+                            <ul className="space-y-4">
+                                <li className="flex gap-3 text-ink-on-dark-muted">
+                                    <Icon name="x-circle" size={20} className="text-red-400" />
+                                    <span>프롬프트 입력을 통한 텍스트 생성 가능</span>
+                                </li>
+                                <li className="flex gap-3 text-ink-on-dark-muted">
+                                    <Icon name="x-circle" size={20} className="text-red-400" />
+                                    <span>AI 서비스의 단순 사용자</span>
+                                </li>
+                                <li className="flex gap-3 text-ink-on-dark-muted">
+                                    <Icon name="x-circle" size={20} className="text-red-400" />
+                                    <span>구체적이지 않은 추상적 AI 활용 역량</span>
+                                </li>
+                            </ul>
+                        </div>
+                        <div className="p-8 rounded-2xl bg-white/10 border-2 border-brand-cyan relative">
+                            <div className="absolute -top-4 -left-4 bg-brand-cyan text-brand-navy font-bold px-4 py-1 rounded-full text-sm">After</div>
+                            <h4 className="text-xl font-bold mb-6">After</h4>
+                            <ul className="space-y-4">
+                                <li className="flex gap-3">
+                                    <Icon name="check-circle" size={20} className="text-brand-cyan" />
+                                    <span className="font-semibold text-lg">멀티 에이전트 오케스트레이션 설계 역량 보유</span>
+                                </li>
+                                <li className="flex gap-3">
+                                    <Icon name="check-circle" size={20} className="text-brand-cyan" />
+                                    <span className="font-semibold text-lg">RAG 기반 지능형 에이전트 시스템 배포 경험</span>
+                                </li>
+                                <li className="flex gap-3">
+                                    <Icon name="check-circle" size={20} className="text-brand-cyan" />
+                                    <span className="font-semibold text-lg">5건의 고도화된 AI 포트폴리오</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        );
+
+        // Spec Section
+        const SpecSection = () => (
+            <section className="section-padding bg-surface-canvas">
+                <div className="container-custom">
+                    <h2 className="text-4xl font-bold mb-16">한눈에 보는 과정 정보</h2>
+                    <div className="overflow-hidden border border-surface-hairline rounded-2xl">
+                        <table className="w-full text-left border-collapse">
+                            <tbody>
+                                {[
+                                    { label: "교육 기간", value: "6개월 (주 5일, 오프라인 몰입)" },
+                                    { label: "모집 정원", value: "30명 (선발 전형 진행)" },
+                                    { label: "교육 비용", value: "무료 (국비지원 100%)" },
+                                    { label: "교육 장소", value: "강남역 인근 오프라인 캠퍼스" },
+                                    { label: "참여 혜택", value: "현업 전문가 멘토링, 수료증 발급, 취업 지원 프로그램" }
+                                ].map((item, idx) => (
+                                    <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-surface-soft'}>
+                                        <th className="py-6 px-8 font-bold text-ink-strong w-1/3 border-b border-surface-hairline">{item.label}</th>
+                                        <td className="py-6 px-8 text-ink-body border-b border-surface-hairline">{item.value}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        );
+
+        // Choose Your Path Section
+        const ChooseYourPath = () => (
+            <section className="section-padding bg-surface-soft">
+                <div className="container-custom text-center">
+                    <h2 className="text-3xl lg:text-4xl font-bold mb-6">이 과정이 망설여진다면?</h2>
+                    <p className="text-xl text-ink-muted mb-12">다른 교육 과정과 비교하고 자신에게 맞는 길을 선택하세요.</p>
+                    <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                        <div className="card-base text-left">
+                            <h4 className="font-bold text-xl mb-4">데이터 분석 입문</h4>
+                            <p className="text-ink-muted mb-6">AI 활용 전 데이터에 대한 기초 체력을 기르고 싶다면</p>
+                            <button className="text-brand-navy font-bold flex items-center gap-2">과정 상세보기 <Icon name="arrow-right" size={18} /></button>
+                        </div>
+                        <div className="card-base text-left">
+                            <h4 className="font-bold text-xl mb-4">프론트엔드 개발</h4>
+                            <p className="text-ink-muted mb-6">직접 서비스를 만드는 개발 역량을 쌓고 싶다면</p>
+                            <button className="text-brand-navy font-bold flex items-center gap-2">과정 상세보기 <Icon name="arrow-right" size={18} /></button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        );
+
+        // FAQ Section
+        const FaqSection = () => {
+            const [openIndex, setOpenIndex] = useState(null);
+            const faqs = [
+                { q: "비전공자도 따라갈 수 있나요?", a: "네, 기초 파이썬 문법부터 시작하여 단계별로 커리큘럼이 구성되어 있어 의지만 있다면 충분히 가능합니다." },
+                { q: "정말 100% 무료인가요?", a: "네, 고용노동부 K-Digital Training 과정으로 내일배움카드를 통해 전액 지원받으실 수 있습니다." },
+                { q: "선발 절차는 어떻게 되나요?", a: "서류 심사와 면접을 통해 학습 의지와 기본적인 논리력을 평가하여 최종 선발합니다." }
+            ];
+
+            return (
+                <section id="faq" className="section-padding bg-surface-canvas">
+                    <div className="container-custom max-w-3xl">
+                        <h2 className="text-4xl font-bold mb-16 text-center">궁금한 점, 미리 풀어드립니다</h2>
+                        <div className="space-y-4">
+                            {faqs.map((faq, idx) => (
+                                <div key={idx} className="border border-surface-hairline rounded-xl overflow-hidden">
+                                    <button 
+                                        className="w-full flex items-center justify-between p-6 text-left font-bold text-lg hover:bg-surface-soft transition-colors"
+                                        onClick={() => setOpenIndex(openIndex === idx ? null : idx)}
+                                    >
+                                        {faq.q}
+                                        <Icon name={openIndex === idx ? "minus" : "plus"} size={20} className="text-ink-muted" />
+                                    </button>
+                                    {openIndex === idx && (
+                                        <div className="p-6 pt-0 text-ink-muted leading-relaxed">
+                                            {faq.a}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </section>
+            );
+        };
+
+        // Final CTA Section
+        const FinalCta = () => (
+            <section id="cta" className="section-padding bg-brand-navy text-white text-center">
+                <div className="container-custom">
+                    <div className="text-brand-cyan font-bold mb-6">잔여 인원 5석 미만</div>
+                    <h2 className="text-4xl lg:text-6xl font-bold mb-10 leading-tight">
+                        AI 오케스트레이터의 길, <br/>지금 시작하세요.
+                    </h2>
+                    <div className="flex flex-col sm:flex-row gap-6 justify-center">
+                        <button className="btn-primary text-xl px-12 py-5">지금 신청하기</button>
+                        <button className="btn-secondary-on-dark text-xl px-12 py-5">전체 과정 비교하기</button>
+                    </div>
+                </div>
+            </section>
+        );
+
+        // Footer
+        const Footer = () => (
+            <footer className="py-16 bg-surface-soft border-t border-surface-hairline">
+                <div className="container-custom">
+                    <div className="flex flex-col md:flex-row justify-between gap-12 mb-12">
+                        <div className="max-w-xs">
+                            <Logo />
+                            <p className="mt-6 text-ink-muted text-sm leading-relaxed">
+                                인공지능 시대의 새로운 기준, 멀티 에이전트 설계 교육을 선도합니다.
+                            </p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-16">
+                            <div>
+                                <h5 className="font-bold mb-6 text-sm uppercase tracking-wider text-ink-strong">과정 안내</h5>
+                                <ul className="space-y-4 text-ink-muted text-sm">
+                                    <li><a href="#" className="hover:text-brand-navy transition-colors">전체 과정보기</a></li>
+                                    <li><a href="#" className="hover:text-brand-navy transition-colors">국비지원 안내</a></li>
+                                    <li><a href="#" className="hover:text-brand-navy transition-colors">캠퍼스 안내</a></li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h5 className="font-bold mb-6 text-sm uppercase tracking-wider text-ink-strong">고객 지원</h5>
+                                <ul className="space-y-4 text-ink-muted text-sm">
+                                    <li><a href="#" className="hover:text-brand-navy transition-colors">문의하기</a></li>
+                                    <li><a href="#" className="hover:text-brand-navy transition-colors">공지사항</a></li>
+                                    <li><a href="#" className="hover:text-brand-navy transition-colors">이용약관</a></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="pt-12 border-t border-surface-hairline flex flex-col md:flex-row justify-between items-center gap-6 text-xs text-ink-muted">
+                        <p>© 2026 AI ORCHESTRA Bootcamp. All rights reserved.</p>
+                        <div className="flex gap-6">
+                            <a href="#" className="hover:text-brand-navy">개인정보처리방침</a>
+                            <a href="#" className="hover:text-brand-navy">이메일무단수집거부</a>
+                        </div>
+                    </div>
+                </div>
+            </footer>
+        );
+
+        // Mobile Fixed Bottom CTA
+        const MobileBottomBar = () => (
+            <div className="fixed bottom-0 left-0 right-0 z-40 p-4 bg-white/80 backdrop-blur-md border-t border-surface-hairline md:hidden">
+                <button className="btn-primary w-full py-4 text-lg">지금 신청하기</button>
+            </div>
+        );
+
+        // Main App
+        const App = () => {
+            return (
+                <div className="min-h-screen">
+                    <Header />
+                    <main>
+                        <HeroSection />
+                        <WhyNowSection />
+                        <TargetCheckSection />
+                        <CoreValueSection />
+                        <CurriculumSection />
+                        <ProjectSection />
+                        <InstructorSection />
+                        <OutcomeSection />
+                        <SpecSection />
+                        <ChooseYourPath />
+                        <FaqSection />
+                        <FinalCta />
+                    </main>
+                    <Footer />
+                    <MobileBottomBar />
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

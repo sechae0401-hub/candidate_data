@@ -1,0 +1,25 @@
+# 환경변수 (API 키, 비밀번호) - 절대 커밋 금지
+.env
+.env.local
+.env.*.local
+
+# Next.js
+.next/
+out/
+node_modules/
+
+# 빌드 결과물
+dist/
+build/
+
+# 로그
+state/validate/latest/*.log
+npm-debug.log*
+
+# OS 파일
+.DS_Store
+Thumbs.db
+
+# 에디터
+.vscode/settings.json
+*.suo

@@ -1,0 +1,74 @@
+# generated: 2026-05-22T00:00:00
+# last_updated: 2026-05-22T00:00:00
+# project: 01_바이브코딩 4주_26.05
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: _bmad-output/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - Developer typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+
+generated: "2026-05-22T00:00:00"
+last_updated: "2026-05-22T00:00:00"
+project: "01_바이브코딩 4주_26.05"
+project_key: NOKEY
+tracking_system: file-system
+story_location: _bmad-output/implementation-artifacts
+
+development_status:
+  # ── Epic 1: 프로젝트 기반 구축 및 공통 인프라 ──
+  epic-1: backlog
+  1-1-프론트엔드-기반-및-디자인-토큰-구축: backlog
+  1-2-백엔드-기반-및-공통-래퍼-구축: backlog
+  1-3-vercel-배포-네비게이션-바-화면-골격-및-세션-가드: backlog
+  epic-1-retrospective: optional
+
+  # ── Epic 2: 엑셀 업로드 및 AI 컬럼 분析 ──
+  epic-2: backlog
+  2-1-양식-다운로드-및-파일-업로드-ui: backlog
+  2-2-양식-자동-검증: backlog
+  2-3-gpt-5-5-전체-컬럼-분析-및-확인-화면: backlog
+  2-4-취소-대상-선택-및-분류-실행-트리거: backlog
+  epic-2-retrospective: optional
+
+  # ── Epic 3: AI 분류 실행 및 결과 저장 ──
+  epic-3: backlog
+  3-1-분류-실행-중-화면-및-진행-표시: backlog
+  3-2-gpt-5-5-분류-엔진: backlog
+  3-3-인사이트-요약-추천-액션-기수-비교-생성-및-결과-저장: backlog
+  3-4-분류-취소-및-완료-피드백: backlog
+  epic-3-retrospective: optional
+
+  # ── Epic 4: 분류 결과 검토 및 노션 출력 ──
+  epic-4: backlog
+  4-1-분류-결과-테이블-및-요약-바: backlog
+  4-2-행-클릭-원문-패널-및-인라인-수정: backlog
+  4-3-노션-형식-복사-및-인사이트-신규-카테고리-표시: backlog
+  4-4-새-분류-시작-및-반응형-레이아웃: backlog
+  epic-4-retrospective: optional
