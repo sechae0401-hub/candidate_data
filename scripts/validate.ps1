@@ -8,7 +8,7 @@ $StartTime = Get-Date
 $LogDir = "state\validate\latest"
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 
-$Mode = $env:VALIDATE_OUTPUT_MODE ?? "summary"
+$Mode = if ([string]::IsNullOrWhiteSpace($env:VALIDATE_OUTPUT_MODE)) { "summary" } else { $env:VALIDATE_OUTPUT_MODE }
 $SkipUntil = $From
 
 function Invoke-Stage {

@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html {
+  font-family: "Pretendard", system-ui, sans-serif;
+}
+
+body {
+  min-height: 100vh;
+  background-color: #ffffff;
+  color: #374151;
+}
+
+* {
+  border-color: #e5e7eb;
+}
