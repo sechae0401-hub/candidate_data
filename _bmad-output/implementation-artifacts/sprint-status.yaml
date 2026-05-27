@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-05-22T00:00:00"
-last_updated: "2026-05-27T00:00:00"
+last_updated: "2026-05-27T15:20:00"
 project: "01_바이브코딩 4주_26.05"
 project_key: NOKEY
 tracking_system: file-system
@@ -43,10 +43,10 @@ story_location: _bmad-output/implementation-artifacts/phase-a
 
 development_status:
   # ── Epic 1: 프로젝트 기반 구축 및 공통 인프라 ──
-  epic-1: in-progress
-  1-1-프론트엔드-기반-및-디자인-토큰-구축: review
-  1-2-백엔드-기반-및-공통-래퍼-구축: review
-  1-3-vercel-배포-네비게이션-바-화면-골격-및-세션-가드: review
+  epic-1: done
+  1-1-프론트엔드-기반-및-디자인-토큰-구축: done
+  1-2-백엔드-기반-및-공통-래퍼-구축: done
+  1-3-vercel-배포-네비게이션-바-화면-골격-및-세션-가드: done
   epic-1-retrospective: optional
 
   # ── Epic 2: 엑셀 업로드 및 AI 컬럼 분析 ──
