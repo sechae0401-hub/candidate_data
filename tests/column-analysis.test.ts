@@ -43,7 +43,7 @@ test("parseColumnAnalysisResponse reads JSON from output_text", () => {
 test("parseColumnAnalysisResponse throws when output_text is null", () => {
   assert.throws(
     () => parseColumnAnalysisResponse({ output_text: null }),
-    /AI 분析 결과를 읽지 못했습니다/,
+    /AI 분석 결과를 읽지 못했습니다/,
   );
 });
 

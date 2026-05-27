@@ -1,0 +1,239 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ArrowLeft, RotateCcw } from "lucide-react";
+import { useRouter } from "next/navigation";
+
+import {
+  buildBatchRanges,
+  buildReviewNotice,
+  calculateProgressPercent,
+  getAnalyzingStageLabel,
+  hasFullClassificationFailure,
+  type AnalyzingStage,
+} from "@/classify/analyzing-progress";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { useToast } from "@/components/ui/use-toast";
+import { CLASSIFICATION_DRAFT_STORAGE_KEY, type ClassificationDraft } from "@/upload/classification-draft";
+
+interface BatchClassificationResponse {
+  processedCount?: number;
+  reviewCount?: number;
+  error?: string;
+}
+
+function readClassificationDraft() {
+  const rawDraft = window.localStorage.getItem(CLASSIFICATION_DRAFT_STORAGE_KEY);
+
+  if (!rawDraft) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(rawDraft) as ClassificationDraft;
+  } catch {
+    return null;
+  }
+}
+
+export function AnalyzingWorkspace() {
+  const router = useRouter();
+  const { toast } = useToast();
+  const [draft, setDraft] = useState<ClassificationDraft | null>(null);
+  const [stage, setStage] = useState<AnalyzingStage>("classifying");
+  const [completedRows, setCompletedRows] = useState(0);
+  const [failedRows, setFailedRows] = useState(0);
+  const [reviewNotice, setReviewNotice] = useState<string | null>(null);
+  const [isWaitingOnGpt, setIsWaitingOnGpt] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const hasStartedRef = useRef(false);
+
+  const totalRows = draft?.rows.length ?? 0;
+  const progressValue = useMemo(() => calculateProgressPercent(completedRows, totalRows), [completedRows, totalRows]);
+
+  const runClassification = useCallback(
+    async (currentDraft: ClassificationDraft) => {
+      setStage("classifying");
+      setCompletedRows(0);
+      setFailedRows(0);
+      setReviewNotice(null);
+      setErrorMessage(null);
+
+      let nextCompletedRows = 0;
+      let nextFailedRows = 0;
+
+      for (const range of buildBatchRanges(currentDraft.rows.length)) {
+        const waitingTimer = window.setTimeout(() => {
+          setIsWaitingOnGpt(true);
+        }, 7000);
+
+        const batchRows = currentDraft.rows.slice(range.startIndex, range.endIndex);
+
+        try {
+          const response = await fetch("/api/classify", {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+            },
+            body: JSON.stringify({
+              sessionId: currentDraft.sessionId,
+              rows: batchRows,
+            }),
+          });
+          const payload = (await response.json()) as BatchClassificationResponse;
+
+          if (!response.ok) {
+            throw new Error(payload.error ?? "분류 배치를 처리하지 못했습니다.");
+          }
+
+          const processedCount = payload.processedCount ?? batchRows.length;
+          const reviewCount = payload.reviewCount ?? 0;
+          nextCompletedRows += processedCount;
+          nextFailedRows += reviewCount;
+          setCompletedRows(nextCompletedRows);
+          setFailedRows(nextFailedRows);
+
+          if (reviewCount > 0) {
+            setReviewNotice(buildReviewNotice(reviewCount));
+          }
+        } catch (error) {
+          console.error("Classification batch failed:", error);
+
+          nextFailedRows += batchRows.length;
+          setFailedRows(nextFailedRows);
+          setReviewNotice(buildReviewNotice(batchRows.length));
+        } finally {
+          window.clearTimeout(waitingTimer);
+          setIsWaitingOnGpt(false);
+        }
+      }
+
+      if (
+        hasFullClassificationFailure({
+          totalRows: currentDraft.rows.length,
+          completedRows: nextCompletedRows,
+          failedRows: nextFailedRows,
+        })
+      ) {
+        setStage("failed");
+        setErrorMessage("분류를 완료하지 못했습니다. 다시 시도해 주세요");
+        return;
+      }
+
+      setStage("insight");
+
+      try {
+        await fetch("/api/insight", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({ sessionId: currentDraft.sessionId }),
+        });
+      } catch (error) {
+        console.error("Insight request failed:", error);
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    const nextDraft = readClassificationDraft();
+
+    if (!nextDraft || nextDraft.rows.length === 0) {
+      setErrorMessage("분류할 행 정보를 찾지 못했습니다. 업로드 화면에서 다시 시작해 주세요");
+      setStage("failed");
+      return;
+    }
+
+    setDraft(nextDraft);
+  }, []);
+
+  useEffect(() => {
+    if (!draft || hasStartedRef.current) {
+      return;
+    }
+
+    hasStartedRef.current = true;
+    void runClassification(draft);
+  }, [draft, runClassification]);
+
+  useEffect(() => {
+    if (stage !== "classifying" && stage !== "insight") {
+      return;
+    }
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "분류가 진행 중입니다. 지금 이탈하면 분류가 중단됩니다. 계속 진행하시겠습니까?";
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [stage]);
+
+  return (
+    <main className="px-6 py-12">
+      <div className="mx-auto flex max-w-2xl flex-col gap-4 rounded-xl border border-hairline bg-white p-8 shadow-sm">
+        <div className="flex items-center justify-between gap-3">
+          <Badge>{getAnalyzingStageLabel(stage)}</Badge>
+          {draft?.cohortName ? <span className="text-caption text-slate">{draft.cohortName}</span> : null}
+        </div>
+
+        <div className="space-y-3">
+          <h1 className="text-heading-page text-ink">{getAnalyzingStageLabel(stage)}</h1>
+          <p className="text-body text-slate">
+            {completedRows}건 완료 / {totalRows}건 전체
+          </p>
+          <Progress value={progressValue} />
+        </div>
+
+        {isWaitingOnGpt ? (
+          <div className="rounded-xl border border-hairline bg-surface p-4 text-caption text-slate">
+            GPT 서버 응답 대기 중입니다. 잠시만 기다려 주세요.
+          </div>
+        ) : null}
+
+        {reviewNotice ? (
+          <div className="rounded-xl border border-status-review bg-status-review-soft p-4 text-caption text-charcoal">
+            {reviewNotice}
+          </div>
+        ) : null}
+
+        {errorMessage ? (
+          <div className="space-y-4 rounded-xl border border-status-error bg-status-error-soft p-4">
+            <p className="text-button text-ink">{errorMessage}</p>
+            <div className="flex flex-wrap gap-3">
+              {draft ? (
+                <Button
+                  type="button"
+                  onClick={() => {
+                    void runClassification(draft);
+                  }}
+                >
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                  다시 시도
+                </Button>
+              ) : null}
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  router.push("/upload");
+                }}
+              >
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                업로드 화면으로 돌아가기
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </main>
+  );
+}
