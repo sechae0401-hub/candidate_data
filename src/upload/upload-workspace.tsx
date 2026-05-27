@@ -2,7 +2,9 @@
 
 import { startTransition, useMemo, useRef, useState } from "react";
 import { Download, FileSpreadsheet, UploadCloud } from "lucide-react";
+import { useRouter } from "next/navigation";
 
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/components/ui/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,12 +13,16 @@ import { cn } from "@/lib/utils";
 import type { ColumnAnalysisItem } from "@/upload/column-analysis";
 import { formatWorkbookSummary, getWorkbookFileError } from "@/upload/file-acceptance";
 import { parseWorkbookFile } from "@/upload/parse-workbook";
+import { countRowsForSelectedResultValues, getResultValueOptions } from "@/upload/result-selection";
+import { SESSION_ID_STORAGE_KEY } from "@/shared/session/session-guard";
+import { buildSessionInsertPayload } from "@/upload/session-start";
 import { validateTemplateColumns, type TemplateValidationResult } from "@/upload/template-validation";
 import type { WorkbookSnapshot } from "@/upload/types";
 
 const TEMPLATE_DOWNLOAD_PATH = "/template/취소사유분석기_양식.xlsx";
 
 export function UploadWorkspace() {
+  const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const [isDragging, setIsDragging] = useState(false);
@@ -29,6 +35,9 @@ export function UploadWorkspace() {
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [columnAnalyses, setColumnAnalyses] = useState<ColumnAnalysisItem[]>([]);
   const [isAnalysisApproved, setIsAnalysisApproved] = useState(false);
+  const [selectedResultValues, setSelectedResultValues] = useState<string[]>([]);
+  const [cohortName, setCohortName] = useState("");
+  const [isCreatingSession, setIsCreatingSession] = useState(false);
 
   const summaryText = useMemo(() => {
     if (!selectedFileName || !snapshot) {
@@ -37,6 +46,22 @@ export function UploadWorkspace() {
 
     return formatWorkbookSummary(selectedFileName, snapshot.totalRows);
   }, [selectedFileName, snapshot]);
+
+  const resultValueOptions = useMemo(() => {
+    if (!snapshot || !isAnalysisApproved) {
+      return [];
+    }
+
+    return getResultValueOptions(snapshot);
+  }, [isAnalysisApproved, snapshot]);
+
+  const selectedRowCount = useMemo(() => {
+    if (!snapshot) {
+      return 0;
+    }
+
+    return countRowsForSelectedResultValues(snapshot, selectedResultValues);
+  }, [selectedResultValues, snapshot]);
 
   async function handleWorkbookSelection(file: File | null) {
     if (!file) {
@@ -52,6 +77,8 @@ export function UploadWorkspace() {
       setColumnAnalyses([]);
       setAnalysisError(null);
       setIsAnalysisApproved(false);
+      setSelectedResultValues([]);
+      setCohortName("");
       setErrorMessage(fileError);
       toast({
         title: "업로드 파일을 확인해 주세요",
@@ -76,6 +103,8 @@ export function UploadWorkspace() {
         setColumnAnalyses([]);
         setAnalysisError(null);
         setIsAnalysisApproved(false);
+        setSelectedResultValues([]);
+        setCohortName("");
       });
 
       if (nextValidationResult.status === "valid") {
@@ -91,6 +120,8 @@ export function UploadWorkspace() {
       setColumnAnalyses([]);
       setAnalysisError(null);
       setIsAnalysisApproved(false);
+      setSelectedResultValues([]);
+      setCohortName("");
       setErrorMessage(fallbackMessage);
       toast({
         title: "파일을 읽지 못했습니다",
@@ -107,6 +138,7 @@ export function UploadWorkspace() {
     setAnalysisError(null);
     setColumnAnalyses([]);
     setIsAnalysisApproved(false);
+    setSelectedResultValues([]);
 
     try {
       const response = await fetch("/api/upload/analyze-columns", {
@@ -142,6 +174,57 @@ export function UploadWorkspace() {
       });
     } finally {
       setIsAnalyzingColumns(false);
+    }
+  }
+
+  async function handleCreateSession() {
+    if (!snapshot || selectedRowCount === 0) {
+      return;
+    }
+
+    setIsCreatingSession(true);
+
+    try {
+      const requestBody = buildSessionInsertPayload({
+        cohortName,
+        totalRows: snapshot.totalRows,
+        excludedRows: snapshot.totalRows - selectedRowCount,
+        selectedResultValues,
+      });
+      const response = await fetch("/api/sessions", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          cohortName: requestBody.cohort_name,
+          totalRows: requestBody.total_rows,
+          excludedRows: requestBody.excluded_rows,
+          selectedResultValues: requestBody.selected_result_values,
+        }),
+      });
+      const payload = (await response.json()) as { sessionId?: string; error?: string };
+
+      if (!response.ok || !payload.sessionId) {
+        throw new Error(payload.error ?? "분류 세션을 만들지 못했습니다.");
+      }
+
+      window.localStorage.setItem(SESSION_ID_STORAGE_KEY, payload.sessionId);
+      toast({
+        title: "분류 세션을 준비했습니다",
+        description: `분류 대상 ${selectedRowCount}건으로 다음 단계로 이동합니다.`,
+      });
+      router.push("/analyzing");
+    } catch (error) {
+      console.error("Create session failed:", error);
+
+      toast({
+        title: "분류를 시작하지 못했습니다",
+        description: "분류 시작 준비 중 오류가 발생했습니다.",
+        variant: "error",
+      });
+    } finally {
+      setIsCreatingSession(false);
     }
   }
 
@@ -335,6 +418,7 @@ export function UploadWorkspace() {
                             type="button"
                             onClick={() => {
                               setIsAnalysisApproved(true);
+                              setSelectedResultValues([]);
                             }}
                           >
                             이 내용으로 진행
@@ -377,39 +461,112 @@ export function UploadWorkspace() {
               <CardDescription>Epic 2의 다음 Story에서 이 영역이 순서대로 채워집니다.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {[
-                "양식 자동 검증",
-                "AI 전체 컬럼 분석",
-                "취소 대상 선택과 분류 실행",
-              ].map((item) => (
+              {["양식 자동 검증", "AI 전체 컬럼 분석"].map((item) => (
                 <div key={item} className="rounded-3xl border border-hairline bg-surface px-4 py-3">
                   <p className="text-button text-ink">{item}</p>
                   <p className="mt-1 text-caption text-slate">현재 Story에서는 진입 흐름과 업로드 결과 표시만 먼저 완성합니다.</p>
                 </div>
               ))}
 
-              <div className="rounded-3xl border border-hairline bg-white p-4">
-                <p className="text-button text-ink">분류 실행 상태</p>
-                <p className="mt-1 text-caption text-slate">
-                  {isAnalysisApproved
-                    ? "컬럼 분석 승인이 완료되었습니다. 다음 Story에서 취소 대상 선택 카드가 실제로 열립니다."
-                    : validationResult?.status === "valid"
-                      ? "양식 검증까지 완료되었습니다. AI 컬럼 분석 승인이 끝나면 이 버튼이 실제 흐름과 연결됩니다."
-                    : "양식 검증을 통과하기 전에는 분류 실행 버튼이 비활성화됩니다."}
-                </p>
-                <div className="mt-4 flex flex-wrap gap-3">
-                  <Button disabled={!isAnalysisApproved} type="button">
-                    분류 실행
-                  </Button>
-                  {validationResult?.status !== "valid" ? (
-                    <Button asChild type="button" variant="secondary">
-                      <a download href={TEMPLATE_DOWNLOAD_PATH}>
-                        양식 다시 다운로드
-                      </a>
-                    </Button>
-                  ) : null}
+              {isAnalysisApproved && snapshot ? (
+                <div className="rounded-3xl border border-hairline bg-white p-4">
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-button text-ink">취소 대상 선택</p>
+                      <p className="mt-1 text-caption text-slate">
+                        최종결과 컬럼 값 중 분류 대상으로 포함할 항목을 선택해 주세요.
+                      </p>
+                    </div>
+
+                    <div className="space-y-3">
+                      {resultValueOptions.map((option) => {
+                        const isChecked = selectedResultValues.includes(option.value);
+
+                        return (
+                          <label
+                            key={option.value}
+                            className="flex items-center justify-between rounded-2xl border border-hairline bg-surface px-4 py-3"
+                          >
+                            <div className="flex items-center gap-3">
+                              <Checkbox
+                                checked={isChecked}
+                                onCheckedChange={(checked) => {
+                                  setSelectedResultValues((currentValues) => {
+                                    if (checked) {
+                                      return [...currentValues, option.value];
+                                    }
+
+                                    return currentValues.filter((value) => value !== option.value);
+                                  });
+                                }}
+                              />
+                              <div>
+                                <p className="text-button text-ink">{option.value}</p>
+                                <p className="text-caption text-slate">{option.count}건</p>
+                              </div>
+                            </div>
+                          </label>
+                        );
+                      })}
+                    </div>
+
+                    <div className="rounded-2xl border border-hairline bg-surface p-4">
+                      <p className="text-button text-ink">분류 대상 {selectedRowCount}건</p>
+                      <p className="mt-1 text-caption text-slate">
+                        취소 관련 항목을 하나 이상 선택해 주세요.
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-button text-ink" htmlFor="cohort-name">
+                        기수명
+                      </label>
+                      <input
+                        id="cohort-name"
+                        className="w-full rounded-full border border-hairline px-4 py-3 text-body text-ink outline-none transition-colors focus:border-ink"
+                        placeholder="예: 3기"
+                        value={cohortName}
+                        onChange={(event) => {
+                          setCohortName(event.target.value);
+                        }}
+                      />
+                    </div>
+
+                    <div className="flex flex-wrap gap-3">
+                      <Button
+                        disabled={selectedRowCount === 0 || isCreatingSession}
+                        type="button"
+                        onClick={() => {
+                          void handleCreateSession();
+                        }}
+                      >
+                        {isCreatingSession ? "분류 준비 중..." : "분류 실행"}
+                      </Button>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="rounded-3xl border border-hairline bg-white p-4">
+                  <p className="text-button text-ink">분류 실행 상태</p>
+                  <p className="mt-1 text-caption text-slate">
+                    {validationResult?.status === "valid"
+                      ? "양식 검증까지 완료되었습니다. AI 컬럼 분석을 승인하면 취소 대상 선택 카드가 열립니다."
+                      : "양식 검증을 통과하기 전에는 분류 실행 버튼이 비활성화됩니다."}
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    <Button disabled type="button">
+                      분류 실행
+                    </Button>
+                    {validationResult?.status !== "valid" ? (
+                      <Button asChild type="button" variant="secondary">
+                        <a download href={TEMPLATE_DOWNLOAD_PATH}>
+                          양식 다시 다운로드
+                        </a>
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

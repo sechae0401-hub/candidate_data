@@ -30,6 +30,12 @@ function normalizeColumnName(columnName: string) {
   return columnName.replace(/\s+/g, "").trim().toLowerCase();
 }
 
+export function findExactColumnName(columns: string[], targetColumnName: string) {
+  const normalizedTarget = normalizeColumnName(targetColumnName);
+
+  return columns.find((columnName) => normalizeColumnName(columnName) === normalizedTarget) ?? null;
+}
+
 function buildBigrams(input: string) {
   if (input.length < 2) {
     return [input];
@@ -139,4 +145,3 @@ export function validateTemplateColumns(columns: WorkbookSnapshot["columns"]): T
     message: VALIDATION_SUCCESS_MESSAGE,
   };
 }
-
