@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-05-22T00:00:00"
-last_updated: "2026-05-27T16:17:00"
+last_updated: "2026-05-27T16:22:00"
 project: "01_바이브코딩 4주_26.05"
 project_key: NOKEY
 tracking_system: file-system
