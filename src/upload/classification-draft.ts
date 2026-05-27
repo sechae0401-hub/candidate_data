@@ -1,24 +1,12 @@
 import { findExactColumnName } from "@/upload/template-validation";
 import type { WorkbookSnapshot } from "@/upload/types";
+import type { ClassificationDraft, ClassificationDraftRow } from "@/shared/types/classification-draft";
 
-export const CLASSIFICATION_DRAFT_STORAGE_KEY = "classification_draft";
+export { CLASSIFICATION_DRAFT_STORAGE_KEY } from "@/shared/types/classification-draft";
+export type { ClassificationDraft, ClassificationDraftRow } from "@/shared/types/classification-draft";
+
 export const MAX_CLASSIFICATION_ROWS = 200;
 export const CLASSIFICATION_LIMIT_ERROR_MESSAGE = "파일 크기(또는 행 수) 제한을 초과했습니다";
-
-export interface ClassificationDraftRow {
-  rowIndex: number;
-  interviewContent: string;
-  notes: string;
-  resultValue: string;
-  source: Record<string, string>;
-}
-
-export interface ClassificationDraft {
-  sessionId: string;
-  cohortName: string | null;
-  totalRows: number;
-  rows: ClassificationDraftRow[];
-}
 
 export function buildClassificationDraft({
   sessionId,

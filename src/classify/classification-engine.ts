@@ -123,13 +123,33 @@ export function parseClassificationResponse(response: { output_text?: string | n
   }
 }
 
+function validateResultRowIndices(
+  rows: ClassifyRow[],
+  parsed: ReturnType<typeof parseClassificationResponse>,
+): void {
+  const inputIndices = new Set(rows.map((row) => row.rowIndex));
+  const allMatch = parsed.results.every((result) => inputIndices.has(result.rowIndex));
+
+  if (!allMatch || parsed.results.length !== rows.length) {
+    console.error("GPT returned mismatched rowIndex values", {
+      input: [...inputIndices],
+      returned: parsed.results.map((r) => r.rowIndex),
+    });
+    throw new ApiError("AI 분류 결과의 행 인덱스가 입력과 일치하지 않습니다.", 502);
+  }
+}
+
 async function classifyNonEmptyRowsWithRetry(rows: ClassifyRow[], runOpenAi: OpenAiJsonRunner, sleep: Sleep) {
   try {
-    return parseClassificationResponse(await runOpenAi(buildClassificationPrompt(rows)));
+    const parsed = parseClassificationResponse(await runOpenAi(buildClassificationPrompt(rows)));
+    validateResultRowIndices(rows, parsed);
+    return parsed;
   } catch (firstError) {
     console.warn("Classification row-layer retry scheduled:", firstError);
     await sleep(ROW_RETRY_DELAY_MS);
-    return parseClassificationResponse(await runOpenAi(buildClassificationPrompt(rows)));
+    const parsed = parseClassificationResponse(await runOpenAi(buildClassificationPrompt(rows)));
+    validateResultRowIndices(rows, parsed);
+    return parsed;
   }
 }
 

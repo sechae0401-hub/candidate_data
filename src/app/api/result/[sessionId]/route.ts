@@ -11,7 +11,7 @@ export async function GET(_request: Request, { params }: { params: { sessionId: 
       const supabase = getSupabaseServerClient();
       const { data: session, error: sessionError } = await supabase
         .from("sessions")
-        .select("*")
+        .select("id, status, cohort_name, total_rows, excluded_rows, analyzed_at, insight_summary")
         .eq("id", params.sessionId)
         .single();
 
@@ -22,7 +22,9 @@ export async function GET(_request: Request, { params }: { params: { sessionId: 
 
       const { data: results, error: resultsError } = await supabase
         .from("classification_results")
-        .select("*")
+        .select(
+          "id, session_id, row_index, primary_cause, secondary_action, detail_tags, competing_course, reasoning, needs_review, review_completed",
+        )
         .eq("session_id", params.sessionId)
         .order("row_index", { ascending: true });
 
@@ -33,7 +35,7 @@ export async function GET(_request: Request, { params }: { params: { sessionId: 
 
       const { data: newCategories, error: categoriesError } = await supabase
         .from("new_categories")
-        .select("*")
+        .select("id, session_id, category_name, occurrence_count")
         .eq("session_id", params.sessionId);
 
       if (categoriesError) {

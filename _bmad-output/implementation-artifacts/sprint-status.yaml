@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-05-22T00:00:00"
-last_updated: "2026-05-27T21:00:00"
+last_updated: "2026-05-27T18:20:00"
 project: "01_바이브코딩 4주_26.05"
 project_key: NOKEY
 tracking_system: file-system
@@ -58,11 +58,11 @@ development_status:
   epic-2-retrospective: done
 
   # ── Epic 3: AI 분류 실행 및 결과 저장 ──
-  epic-3: in-progress
-  3-1-분류-실행-중-화면-및-진행-표시: review
-  3-2-gpt-5-5-분류-엔진: review
-  3-3-인사이트-요약-추천-액션-기수-비교-생성-및-결과-저장: review
-  3-4-분류-취소-및-완료-피드백: review
+  epic-3: done
+  3-1-분류-실행-중-화면-및-진행-표시: done
+  3-2-gpt-5-5-분류-엔진: done
+  3-3-인사이트-요약-추천-액션-기수-비교-생성-및-결과-저장: done
+  3-4-분류-취소-및-완료-피드백: done
   epic-3-retrospective: optional
 
   # ── Epic 4: 분류 결과 검토 및 노션 출력 ──

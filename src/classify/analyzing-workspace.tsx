@@ -17,11 +17,22 @@ import {
   COMPLETION_FADE_DURATION_MS,
   COMPLETION_MESSAGE_DURATION_MS,
 } from "@/classify/completion-feedback";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/components/ui/use-toast";
-import { CLASSIFICATION_DRAFT_STORAGE_KEY, type ClassificationDraft } from "@/upload/classification-draft";
+import { CLASSIFICATION_DRAFT_STORAGE_KEY, type ClassificationDraft } from "@/shared/types/classification-draft";
 import { SESSION_ID_STORAGE_KEY } from "@/shared/session/session-guard";
 
 interface BatchClassificationResponse {
@@ -57,12 +68,14 @@ export function AnalyzingWorkspace() {
   const [isCancelling, setIsCancelling] = useState(false);
   const [isRedirectingToResult, setIsRedirectingToResult] = useState(false);
   const hasStartedRef = useRef(false);
+  const isCancelledRef = useRef(false);
 
   const totalRows = draft?.rows.length ?? 0;
   const progressValue = useMemo(() => calculateProgressPercent(completedRows, totalRows), [completedRows, totalRows]);
 
   const runClassification = useCallback(
     async (currentDraft: ClassificationDraft) => {
+      isCancelledRef.current = false;
       setStage("classifying");
       setCompletedRows(0);
       setFailedRows(0);
@@ -73,6 +86,10 @@ export function AnalyzingWorkspace() {
       let nextFailedRows = 0;
 
       for (const range of buildBatchRanges(currentDraft.rows.length)) {
+        if (isCancelledRef.current) {
+          break;
+        }
+
         const waitingTimer = window.setTimeout(() => {
           setIsWaitingOnGpt(true);
         }, 7000);
@@ -168,12 +185,7 @@ export function AnalyzingWorkspace() {
       return;
     }
 
-    const confirmed = window.confirm("분류를 취소하시겠습니까? 지금까지의 결과는 저장되지 않습니다.");
-
-    if (!confirmed) {
-      return;
-    }
-
+    isCancelledRef.current = true;
     setIsCancelling(true);
 
     try {
@@ -199,6 +211,7 @@ export function AnalyzingWorkspace() {
       router.push("/upload");
     } catch (error) {
       console.error("Cancel classification failed:", error);
+      isCancelledRef.current = false;
       toast({
         title: "분류를 취소하지 못했습니다",
         description: "잠시 후 다시 시도해 주세요.",
@@ -270,7 +283,7 @@ export function AnalyzingWorkspace() {
 
         {stage === "complete" ? (
           <div className="rounded-xl border border-status-done bg-status-done-soft p-4 text-button text-ink">
-            {buildCompletionMessage(totalRows)}
+            {buildCompletionMessage(completedRows)}
           </div>
         ) : null}
 
@@ -317,16 +330,31 @@ export function AnalyzingWorkspace() {
 
         {stage === "classifying" || stage === "insight" ? (
           <div className="pt-2">
-            <Button
-              disabled={isCancelling}
-              type="button"
-              variant="danger"
-              onClick={() => {
-                void handleCancelClassification();
-              }}
-            >
-              {isCancelling ? "취소 처리 중..." : "분류 취소"}
-            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button disabled={isCancelling} type="button" variant="danger">
+                  {isCancelling ? "취소 처리 중..." : "분류 취소"}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>분류를 취소하시겠습니까?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    지금까지의 결과는 저장되지 않습니다.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>계속 진행</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => {
+                      void handleCancelClassification();
+                    }}
+                  >
+                    취소 확인
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         ) : null}
       </div>
