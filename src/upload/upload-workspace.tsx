@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { cn } from "@/lib/utils";
 import { formatWorkbookSummary, getWorkbookFileError } from "@/upload/file-acceptance";
 import { parseWorkbookFile } from "@/upload/parse-workbook";
+import { validateTemplateColumns, type TemplateValidationResult } from "@/upload/template-validation";
 import type { WorkbookSnapshot } from "@/upload/types";
 
 const TEMPLATE_DOWNLOAD_PATH = "/template/취소사유분석기_양식.xlsx";
@@ -22,6 +23,7 @@ export function UploadWorkspace() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
   const [snapshot, setSnapshot] = useState<WorkbookSnapshot | null>(null);
+  const [validationResult, setValidationResult] = useState<TemplateValidationResult | null>(null);
 
   const summaryText = useMemo(() => {
     if (!selectedFileName || !snapshot) {
@@ -41,6 +43,7 @@ export function UploadWorkspace() {
     if (fileError) {
       setSnapshot(null);
       setSelectedFileName(null);
+      setValidationResult(null);
       setErrorMessage(fileError);
       toast({
         title: "업로드 파일을 확인해 주세요",
@@ -55,10 +58,13 @@ export function UploadWorkspace() {
 
     try {
       const nextSnapshot = await parseWorkbookFile(file);
+      const nextValidationResult = validateTemplateColumns(nextSnapshot.columns);
 
       startTransition(() => {
         setSelectedFileName(file.name);
         setSnapshot(nextSnapshot);
+        setValidationResult(nextValidationResult);
+        setErrorMessage(nextValidationResult.status === "valid" ? null : nextValidationResult.message);
       });
     } catch (error) {
       console.error("Workbook parsing failed:", error);
@@ -66,6 +72,7 @@ export function UploadWorkspace() {
       const fallbackMessage = "엑셀 파일을 읽는 중 오류가 발생했습니다. 다시 시도해 주세요";
       setSnapshot(null);
       setSelectedFileName(null);
+      setValidationResult(null);
       setErrorMessage(fallbackMessage);
       toast({
         title: "파일을 읽지 못했습니다",
@@ -189,6 +196,24 @@ export function UploadWorkspace() {
                     </div>
                   )}
 
+                  {validationResult ? (
+                    <div
+                      className={cn(
+                        "rounded-3xl border p-4",
+                        validationResult.status === "valid"
+                          ? "border-status-done bg-status-done-soft"
+                          : "border-status-error bg-status-error-soft",
+                      )}
+                    >
+                      <p className="text-button text-ink">{validationResult.message}</p>
+                      <p className="mt-1 text-caption text-slate">
+                        {validationResult.status === "valid"
+                          ? "필수 컬럼 확인이 끝났습니다. 다음 Story에서 AI 컬럼 분석이 이 상태를 이어받습니다."
+                          : "양식 다운로드 버튼으로 다시 양식을 받아 컬럼명을 맞춘 뒤 재업로드해 주세요."}
+                      </p>
+                    </div>
+                  ) : null}
+
                   {errorMessage ? (
                     <div className="rounded-3xl border border-status-error bg-status-error-soft p-4 text-caption text-charcoal">
                       {errorMessage}
@@ -221,6 +246,27 @@ export function UploadWorkspace() {
                   <p className="mt-1 text-caption text-slate">현재 Story에서는 진입 흐름과 업로드 결과 표시만 먼저 완성합니다.</p>
                 </div>
               ))}
+
+              <div className="rounded-3xl border border-hairline bg-white p-4">
+                <p className="text-button text-ink">분류 실행 상태</p>
+                <p className="mt-1 text-caption text-slate">
+                  {validationResult?.status === "valid"
+                    ? "양식 검증까지 완료되었습니다. AI 컬럼 분석 승인이 끝나면 이 버튼이 실제 흐름과 연결됩니다."
+                    : "양식 검증을 통과하기 전에는 분류 실행 버튼이 비활성화됩니다."}
+                </p>
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <Button disabled type="button">
+                    분류 실행
+                  </Button>
+                  {validationResult?.status !== "valid" ? (
+                    <Button asChild type="button" variant="secondary">
+                      <a download href={TEMPLATE_DOWNLOAD_PATH}>
+                        양식 다시 다운로드
+                      </a>
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -228,4 +274,3 @@ export function UploadWorkspace() {
     </main>
   );
 }
-
