@@ -40,6 +40,34 @@ test("parseColumnAnalysisResponse reads JSON from output_text", () => {
   assert.equal(analyses[0]?.understanding, "수강자가 남긴 면담 요약 내용입니다.");
 });
 
+test("parseColumnAnalysisResponse throws when output_text is null", () => {
+  assert.throws(
+    () => parseColumnAnalysisResponse({ output_text: null }),
+    /AI 분析 결과를 읽지 못했습니다/,
+  );
+});
+
+test("parseColumnAnalysisResponse throws when output_text is undefined", () => {
+  assert.throws(
+    () => parseColumnAnalysisResponse({}),
+    /AI 분석 결과를 읽지 못했습니다/,
+  );
+});
+
+test("parseColumnAnalysisResponse throws when output_text is not valid JSON", () => {
+  assert.throws(
+    () => parseColumnAnalysisResponse({ output_text: "not-json" }),
+    /AI 분석 결과 형식이 올바르지 않습니다/,
+  );
+});
+
+test("parseColumnAnalysisResponse throws when columnAnalyses array is empty", () => {
+  assert.throws(
+    () => parseColumnAnalysisResponse({ output_text: JSON.stringify({ columnAnalyses: [] }) }),
+    /AI 분석 결과 형식이 올바르지 않습니다/,
+  );
+});
+
 test("analyzeWorkbookColumns validates requests before calling OpenAI", async () => {
   await assert.rejects(
     () =>

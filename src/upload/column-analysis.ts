@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { ApiError } from "@/lib/api-handler";
 
-const UploadRowRecordSchema = z.record(z.string(), z.string());
+const UploadRowRecordSchema = z.record(z.string().max(200), z.string().max(500));
 
 export const AnalyzeColumnsRequestSchema = z.object({
   columns: z.array(z.string().trim().min(1)).min(1),

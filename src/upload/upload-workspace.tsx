@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useMemo, useRef, useState } from "react";
+import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { Download, FileSpreadsheet, UploadCloud } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -15,11 +15,10 @@ import { formatWorkbookSummary, getWorkbookFileError } from "@/upload/file-accep
 import { parseWorkbookFile } from "@/upload/parse-workbook";
 import { countRowsForSelectedResultValues, getResultValueOptions } from "@/upload/result-selection";
 import { SESSION_ID_STORAGE_KEY } from "@/shared/session/session-guard";
-import { buildSessionInsertPayload } from "@/upload/session-start";
 import { validateTemplateColumns, type TemplateValidationResult } from "@/upload/template-validation";
 import type { WorkbookSnapshot } from "@/upload/types";
 
-const TEMPLATE_DOWNLOAD_PATH = "/template/취소사유분석기_양식.xlsx";
+const TEMPLATE_DOWNLOAD_PATH = "/templates/cancellation-template.xlsx";
 
 export function UploadWorkspace() {
   const router = useRouter();
@@ -38,6 +37,13 @@ export function UploadWorkspace() {
   const [selectedResultValues, setSelectedResultValues] = useState<string[]>([]);
   const [cohortName, setCohortName] = useState("");
   const [isCreatingSession, setIsCreatingSession] = useState(false);
+  const analysisAbortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      analysisAbortRef.current?.abort();
+    };
+  }, []);
 
   const summaryText = useMemo(() => {
     if (!selectedFileName || !snapshot) {
@@ -99,7 +105,7 @@ export function UploadWorkspace() {
         setSelectedFileName(file.name);
         setSnapshot(nextSnapshot);
         setValidationResult(nextValidationResult);
-        setErrorMessage(nextValidationResult.status === "valid" ? null : nextValidationResult.message);
+        setErrorMessage(null);
         setColumnAnalyses([]);
         setAnalysisError(null);
         setIsAnalysisApproved(false);
@@ -134,6 +140,10 @@ export function UploadWorkspace() {
   }
 
   async function runColumnAnalysis(currentSnapshot: WorkbookSnapshot) {
+    analysisAbortRef.current?.abort();
+    const controller = new AbortController();
+    analysisAbortRef.current = controller;
+
     setIsAnalyzingColumns(true);
     setAnalysisError(null);
     setColumnAnalyses([]);
@@ -150,6 +160,7 @@ export function UploadWorkspace() {
           columns: currentSnapshot.columns,
           sampleRows: currentSnapshot.rows.slice(0, 3),
         }),
+        signal: controller.signal,
       });
 
       const payload = (await response.json()) as {
@@ -163,6 +174,10 @@ export function UploadWorkspace() {
 
       setColumnAnalyses(payload.columnAnalyses);
     } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        return;
+      }
+
       console.error("Column analysis failed:", error);
 
       const fallbackMessage = "AI 분석 중 오류가 발생했습니다. 다시 시도해 주세요";
@@ -173,7 +188,9 @@ export function UploadWorkspace() {
         variant: "error",
       });
     } finally {
-      setIsAnalyzingColumns(false);
+      if (!controller.signal.aborted) {
+        setIsAnalyzingColumns(false);
+      }
     }
   }
 
@@ -185,22 +202,16 @@ export function UploadWorkspace() {
     setIsCreatingSession(true);
 
     try {
-      const requestBody = buildSessionInsertPayload({
-        cohortName,
-        totalRows: snapshot.totalRows,
-        excludedRows: snapshot.totalRows - selectedRowCount,
-        selectedResultValues,
-      });
       const response = await fetch("/api/sessions", {
         method: "POST",
         headers: {
           "content-type": "application/json",
         },
         body: JSON.stringify({
-          cohortName: requestBody.cohort_name,
-          totalRows: requestBody.total_rows,
-          excludedRows: requestBody.excluded_rows,
-          selectedResultValues: requestBody.selected_result_values,
+          cohortName: cohortName.trim() || null,
+          totalRows: snapshot.totalRows,
+          excludedRows: snapshot.totalRows - selectedRowCount,
+          selectedResultValues,
         }),
       });
       const payload = (await response.json()) as { sessionId?: string; error?: string };
@@ -457,17 +468,10 @@ export function UploadWorkspace() {
 
           <Card className="rounded-[28px]">
             <CardHeader>
-              <CardTitle>다음 단계 예고</CardTitle>
-              <CardDescription>Epic 2의 다음 Story에서 이 영역이 순서대로 채워집니다.</CardDescription>
+              <CardTitle>취소 대상 선택 및 분류 실행</CardTitle>
+              <CardDescription>AI 컬럼 분석을 승인하면 분류 대상을 선택하고 분류를 시작할 수 있습니다.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {["양식 자동 검증", "AI 전체 컬럼 분석"].map((item) => (
-                <div key={item} className="rounded-3xl border border-hairline bg-surface px-4 py-3">
-                  <p className="text-button text-ink">{item}</p>
-                  <p className="mt-1 text-caption text-slate">현재 Story에서는 진입 흐름과 업로드 결과 표시만 먼저 완성합니다.</p>
-                </div>
-              ))}
-
               {isAnalysisApproved && snapshot ? (
                 <div className="rounded-3xl border border-hairline bg-white p-4">
                   <div className="space-y-4">
@@ -524,6 +528,7 @@ export function UploadWorkspace() {
                       <input
                         id="cohort-name"
                         className="w-full rounded-full border border-hairline px-4 py-3 text-body text-ink outline-none transition-colors focus:border-ink"
+                        maxLength={120}
                         placeholder="예: 3기"
                         value={cohortName}
                         onChange={(event) => {

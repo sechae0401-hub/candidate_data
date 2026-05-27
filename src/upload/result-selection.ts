@@ -47,7 +47,7 @@ export function countRowsForSelectedResultValues(snapshot: WorkbookSnapshot, sel
   const resultColumnName = getFinalResultColumnName(snapshot);
 
   return snapshot.rows.reduce((count, row) => {
-    return selectedSet.has(row[resultColumnName]) ? count + 1 : count;
+    return selectedSet.has(row[resultColumnName]?.trim()) ? count + 1 : count;
   }, 0);
 }
 

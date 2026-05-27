@@ -12,6 +12,11 @@ export async function parseWorkbookFile(file: File): Promise<WorkbookSnapshot> {
   }
 
   const worksheet = workbook.Sheets[firstSheetName];
+
+  if (!worksheet) {
+    throw new Error("업로드한 파일의 시트 데이터를 읽을 수 없습니다");
+  }
+
   const matrix = XLSX.utils.sheet_to_json<unknown[]>(worksheet, {
     header: 1,
     blankrows: false,

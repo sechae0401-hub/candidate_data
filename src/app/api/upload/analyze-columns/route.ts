@@ -1,12 +1,18 @@
-import { withApiHandler } from "@/lib/api-handler";
+import { ApiError, withApiHandler } from "@/lib/api-handler";
 import { runOpenAiJsonRequest } from "@/lib/gpt-client";
-import { analyzeWorkbookColumns } from "@/upload/column-analysis";
+import { AnalyzeColumnsRequestSchema, analyzeWorkbookColumns } from "@/upload/column-analysis";
 
 export async function POST(request: Request) {
   return withApiHandler(
     async () => {
-      const body = (await request.json()) as Parameters<typeof analyzeWorkbookColumns>[0];
-      const columnAnalyses = await analyzeWorkbookColumns(body, runOpenAiJsonRequest);
+      const rawBody: unknown = await request.json();
+      const parsed = AnalyzeColumnsRequestSchema.safeParse(rawBody);
+
+      if (!parsed.success) {
+        throw new ApiError("요청 형식이 올바르지 않습니다.", 400);
+      }
+
+      const columnAnalyses = await analyzeWorkbookColumns(parsed.data, runOpenAiJsonRequest);
 
       return { columnAnalyses };
     },

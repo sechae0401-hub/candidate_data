@@ -21,12 +21,10 @@ function hasAnyValue(row: unknown[]) {
 }
 
 function buildColumns(headerRow: unknown[]) {
-  return headerRow
-    .map((cell, index) => {
-      const label = sanitizeWorkbookCellValue(cell);
-      return label === "" ? `컬럼${index + 1}` : label;
-    })
-    .filter((label) => label !== "");
+  return headerRow.map((cell, index) => {
+    const label = sanitizeWorkbookCellValue(cell);
+    return label === "" ? `컬럼${index + 1}` : label;
+  });
 }
 
 function buildRowRecord(columns: string[], row: unknown[]): UploadRowRecord {

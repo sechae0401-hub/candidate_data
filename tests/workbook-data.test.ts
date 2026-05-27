@@ -23,6 +23,27 @@ test("creates workbook snapshot from the first sheet matrix", () => {
   });
 });
 
+test("returns empty snapshot from completely empty matrix", () => {
+  const snapshot = createWorkbookSnapshotFromMatrix([], "Sheet1");
+
+  assert.deepEqual(snapshot.columns, []);
+  assert.equal(snapshot.totalRows, 0);
+  assert.deepEqual(snapshot.rows, []);
+});
+
+test("returns zero rows when body rows are all blank", () => {
+  const snapshot = createWorkbookSnapshotFromMatrix(
+    [
+      ["인터뷰내용", "최종결과"],
+      ["", ""],
+      ["", ""],
+    ],
+    "Sheet1",
+  );
+
+  assert.equal(snapshot.totalRows, 0);
+});
+
 test("skips empty body rows while keeping generated fallback headers", () => {
   const snapshot = createWorkbookSnapshotFromMatrix(
     [
