@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import type { ColumnAnalysisItem } from "@/upload/column-analysis";
 import { formatWorkbookSummary, getWorkbookFileError } from "@/upload/file-acceptance";
 import { parseWorkbookFile } from "@/upload/parse-workbook";
 import { validateTemplateColumns, type TemplateValidationResult } from "@/upload/template-validation";
@@ -24,6 +25,10 @@ export function UploadWorkspace() {
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
   const [snapshot, setSnapshot] = useState<WorkbookSnapshot | null>(null);
   const [validationResult, setValidationResult] = useState<TemplateValidationResult | null>(null);
+  const [isAnalyzingColumns, setIsAnalyzingColumns] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [columnAnalyses, setColumnAnalyses] = useState<ColumnAnalysisItem[]>([]);
+  const [isAnalysisApproved, setIsAnalysisApproved] = useState(false);
 
   const summaryText = useMemo(() => {
     if (!selectedFileName || !snapshot) {
@@ -44,6 +49,9 @@ export function UploadWorkspace() {
       setSnapshot(null);
       setSelectedFileName(null);
       setValidationResult(null);
+      setColumnAnalyses([]);
+      setAnalysisError(null);
+      setIsAnalysisApproved(false);
       setErrorMessage(fileError);
       toast({
         title: "업로드 파일을 확인해 주세요",
@@ -65,7 +73,14 @@ export function UploadWorkspace() {
         setSnapshot(nextSnapshot);
         setValidationResult(nextValidationResult);
         setErrorMessage(nextValidationResult.status === "valid" ? null : nextValidationResult.message);
+        setColumnAnalyses([]);
+        setAnalysisError(null);
+        setIsAnalysisApproved(false);
       });
+
+      if (nextValidationResult.status === "valid") {
+        await runColumnAnalysis(nextSnapshot);
+      }
     } catch (error) {
       console.error("Workbook parsing failed:", error);
 
@@ -73,6 +88,9 @@ export function UploadWorkspace() {
       setSnapshot(null);
       setSelectedFileName(null);
       setValidationResult(null);
+      setColumnAnalyses([]);
+      setAnalysisError(null);
+      setIsAnalysisApproved(false);
       setErrorMessage(fallbackMessage);
       toast({
         title: "파일을 읽지 못했습니다",
@@ -81,6 +99,49 @@ export function UploadWorkspace() {
       });
     } finally {
       setIsParsing(false);
+    }
+  }
+
+  async function runColumnAnalysis(currentSnapshot: WorkbookSnapshot) {
+    setIsAnalyzingColumns(true);
+    setAnalysisError(null);
+    setColumnAnalyses([]);
+    setIsAnalysisApproved(false);
+
+    try {
+      const response = await fetch("/api/upload/analyze-columns", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          columns: currentSnapshot.columns,
+          sampleRows: currentSnapshot.rows.slice(0, 3),
+        }),
+      });
+
+      const payload = (await response.json()) as {
+        columnAnalyses?: ColumnAnalysisItem[];
+        error?: string;
+      };
+
+      if (!response.ok || !payload.columnAnalyses) {
+        throw new Error(payload.error ?? "AI 분석 중 오류가 발생했습니다.");
+      }
+
+      setColumnAnalyses(payload.columnAnalyses);
+    } catch (error) {
+      console.error("Column analysis failed:", error);
+
+      const fallbackMessage = "AI 분석 중 오류가 발생했습니다. 다시 시도해 주세요";
+      setAnalysisError(fallbackMessage);
+      toast({
+        title: "AI 분석을 완료하지 못했습니다",
+        description: fallbackMessage,
+        variant: "error",
+      });
+    } finally {
+      setIsAnalyzingColumns(false);
     }
   }
 
@@ -214,6 +275,86 @@ export function UploadWorkspace() {
                     </div>
                   ) : null}
 
+                  {isAnalyzingColumns ? (
+                    <div className="rounded-3xl border border-hairline bg-white p-4">
+                      <p className="text-button text-ink">AI가 파일을 분석하고 있습니다...</p>
+                      <p className="mt-1 text-caption text-slate">
+                        검증을 통과한 컬럼 구조를 GPT-5.5가 읽고 있습니다. 잠시만 기다려 주세요.
+                      </p>
+                    </div>
+                  ) : null}
+
+                  {analysisError ? (
+                    <div className="rounded-3xl border border-status-error bg-status-error-soft p-4">
+                      <p className="text-button text-ink">{analysisError}</p>
+                      <div className="mt-3">
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={() => {
+                            if (snapshot) {
+                              void runColumnAnalysis(snapshot);
+                            }
+                          }}
+                        >
+                          다시 분석
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {columnAnalyses.length > 0 ? (
+                    <div className="rounded-3xl border border-hairline bg-white p-4">
+                      <div className="space-y-4">
+                        <div>
+                          <p className="text-button text-ink">AI가 이렇게 이해했습니다</p>
+                          <p className="mt-1 text-caption text-slate">
+                            컬럼 이해가 맞는지 확인한 뒤 승인해야 다음 단계가 열립니다.
+                          </p>
+                        </div>
+                        <div className="overflow-hidden rounded-3xl border border-hairline">
+                          <table className="min-w-full border-collapse">
+                            <thead className="bg-surface">
+                              <tr>
+                                <th className="px-4 py-3 text-left text-caption text-slate">컬럼명</th>
+                                <th className="px-4 py-3 text-left text-caption text-slate">AI의 이해</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {columnAnalyses.map((analysis) => (
+                                <tr key={analysis.columnName} className="border-t border-hairline">
+                                  <td className="px-4 py-3 text-button text-ink">{analysis.columnName}</td>
+                                  <td className="px-4 py-3 text-caption text-slate">{analysis.understanding}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                        <div className="flex flex-wrap gap-3">
+                          <Button
+                            type="button"
+                            onClick={() => {
+                              setIsAnalysisApproved(true);
+                            }}
+                          >
+                            이 내용으로 진행
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => {
+                              if (snapshot) {
+                                void runColumnAnalysis(snapshot);
+                              }
+                            }}
+                          >
+                            다시 분석
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+
                   {errorMessage ? (
                     <div className="rounded-3xl border border-status-error bg-status-error-soft p-4 text-caption text-charcoal">
                       {errorMessage}
@@ -250,12 +391,14 @@ export function UploadWorkspace() {
               <div className="rounded-3xl border border-hairline bg-white p-4">
                 <p className="text-button text-ink">분류 실행 상태</p>
                 <p className="mt-1 text-caption text-slate">
-                  {validationResult?.status === "valid"
-                    ? "양식 검증까지 완료되었습니다. AI 컬럼 분석 승인이 끝나면 이 버튼이 실제 흐름과 연결됩니다."
+                  {isAnalysisApproved
+                    ? "컬럼 분석 승인이 완료되었습니다. 다음 Story에서 취소 대상 선택 카드가 실제로 열립니다."
+                    : validationResult?.status === "valid"
+                      ? "양식 검증까지 완료되었습니다. AI 컬럼 분석 승인이 끝나면 이 버튼이 실제 흐름과 연결됩니다."
                     : "양식 검증을 통과하기 전에는 분류 실행 버튼이 비활성화됩니다."}
                 </p>
                 <div className="mt-4 flex flex-wrap gap-3">
-                  <Button disabled type="button">
+                  <Button disabled={!isAnalysisApproved} type="button">
                     분류 실행
                   </Button>
                   {validationResult?.status !== "valid" ? (
