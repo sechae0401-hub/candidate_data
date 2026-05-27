@@ -12,11 +12,17 @@ import {
   hasFullClassificationFailure,
   type AnalyzingStage,
 } from "@/classify/analyzing-progress";
+import {
+  buildCompletionMessage,
+  COMPLETION_FADE_DURATION_MS,
+  COMPLETION_MESSAGE_DURATION_MS,
+} from "@/classify/completion-feedback";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/components/ui/use-toast";
 import { CLASSIFICATION_DRAFT_STORAGE_KEY, type ClassificationDraft } from "@/upload/classification-draft";
+import { SESSION_ID_STORAGE_KEY } from "@/shared/session/session-guard";
 
 interface BatchClassificationResponse {
   processedCount?: number;
@@ -48,6 +54,8 @@ export function AnalyzingWorkspace() {
   const [reviewNotice, setReviewNotice] = useState<string | null>(null);
   const [isWaitingOnGpt, setIsWaitingOnGpt] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [isRedirectingToResult, setIsRedirectingToResult] = useState(false);
   const hasStartedRef = useRef(false);
 
   const totalRows = draft?.rows.length ?? 0;
@@ -125,19 +133,81 @@ export function AnalyzingWorkspace() {
       setStage("insight");
 
       try {
-        await fetch("/api/insight", {
+        const response = await fetch("/api/insight", {
           method: "POST",
           headers: {
             "content-type": "application/json",
           },
           body: JSON.stringify({ sessionId: currentDraft.sessionId }),
         });
+
+        if (!response.ok) {
+          const payload = (await response.json()) as { error?: string };
+          throw new Error(payload.error ?? "인사이트 요약을 생성하지 못했습니다.");
+        }
+
+        setCompletedRows(currentDraft.rows.length);
+        setStage("complete");
+        window.setTimeout(() => {
+          setIsRedirectingToResult(true);
+          window.setTimeout(() => {
+            router.push("/result");
+          }, COMPLETION_FADE_DURATION_MS);
+        }, COMPLETION_MESSAGE_DURATION_MS);
       } catch (error) {
         console.error("Insight request failed:", error);
+        setStage("failed");
+        setErrorMessage("분류를 완료하지 못했습니다. 다시 시도해 주세요");
       }
     },
-    [],
+    [router],
   );
+
+  async function handleCancelClassification() {
+    if (!draft) {
+      return;
+    }
+
+    const confirmed = window.confirm("분류를 취소하시겠습니까? 지금까지의 결과는 저장되지 않습니다.");
+
+    if (!confirmed) {
+      return;
+    }
+
+    setIsCancelling(true);
+
+    try {
+      const response = await fetch(`/api/sessions/${draft.sessionId}`, {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ status: "cancelled" }),
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json()) as { error?: string };
+        throw new Error(payload.error ?? "분류 취소를 완료하지 못했습니다.");
+      }
+
+      window.localStorage.removeItem(SESSION_ID_STORAGE_KEY);
+      window.localStorage.removeItem(CLASSIFICATION_DRAFT_STORAGE_KEY);
+      toast({
+        title: "분류를 취소했습니다",
+        description: "업로드 화면으로 돌아갑니다.",
+      });
+      router.push("/upload");
+    } catch (error) {
+      console.error("Cancel classification failed:", error);
+      toast({
+        title: "분류를 취소하지 못했습니다",
+        description: "잠시 후 다시 시도해 주세요.",
+        variant: "error",
+      });
+    } finally {
+      setIsCancelling(false);
+    }
+  }
 
   useEffect(() => {
     const nextDraft = readClassificationDraft();
@@ -179,7 +249,12 @@ export function AnalyzingWorkspace() {
 
   return (
     <main className="px-6 py-12">
-      <div className="mx-auto flex max-w-2xl flex-col gap-4 rounded-xl border border-hairline bg-white p-8 shadow-sm">
+      <div
+        className={[
+          "mx-auto flex max-w-2xl flex-col gap-4 rounded-xl border border-hairline bg-white p-8 shadow-sm transition-opacity duration-150",
+          isRedirectingToResult ? "opacity-0" : "opacity-100",
+        ].join(" ")}
+      >
         <div className="flex items-center justify-between gap-3">
           <Badge>{getAnalyzingStageLabel(stage)}</Badge>
           {draft?.cohortName ? <span className="text-caption text-slate">{draft.cohortName}</span> : null}
@@ -192,6 +267,12 @@ export function AnalyzingWorkspace() {
           </p>
           <Progress value={progressValue} />
         </div>
+
+        {stage === "complete" ? (
+          <div className="rounded-xl border border-status-done bg-status-done-soft p-4 text-button text-ink">
+            {buildCompletionMessage(totalRows)}
+          </div>
+        ) : null}
 
         {isWaitingOnGpt ? (
           <div className="rounded-xl border border-hairline bg-surface p-4 text-caption text-slate">
@@ -231,6 +312,21 @@ export function AnalyzingWorkspace() {
                 업로드 화면으로 돌아가기
               </Button>
             </div>
+          </div>
+        ) : null}
+
+        {stage === "classifying" || stage === "insight" ? (
+          <div className="pt-2">
+            <Button
+              disabled={isCancelling}
+              type="button"
+              variant="danger"
+              onClick={() => {
+                void handleCancelClassification();
+              }}
+            >
+              {isCancelling ? "취소 처리 중..." : "분류 취소"}
+            </Button>
           </div>
         ) : null}
       </div>
