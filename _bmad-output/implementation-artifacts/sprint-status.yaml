@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-05-22T00:00:00"
-last_updated: "2026-05-27T16:00:00"
+last_updated: "2026-05-27T18:00:00"
 project: "01_바이브코딩 4주_26.05"
 project_key: NOKEY
 tracking_system: file-system
@@ -50,12 +50,12 @@ development_status:
   epic-1-retrospective: done
 
   # ── Epic 2: 엑셀 업로드 및 AI 컬럼 분析 ──
-  epic-2: backlog
-  2-1-양식-다운로드-및-파일-업로드-ui: backlog
-  2-2-양식-자동-검증: backlog
-  2-3-gpt-5-5-전체-컬럼-분析-및-확인-화면: backlog
-  2-4-취소-대상-선택-및-분류-실행-트리거: backlog
-  epic-2-retrospective: optional
+  epic-2: done
+  2-1-양식-다운로드-및-파일-업로드-ui: done
+  2-2-양식-자동-검증: done
+  2-3-gpt-5-5-전체-컬럼-분析-및-확인-화면: done
+  2-4-취소-대상-선택-및-분류-실행-트리거: done
+  epic-2-retrospective: done
 
   # ── Epic 3: AI 분류 실행 및 결과 저장 ──
   epic-3: backlog

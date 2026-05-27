@@ -24,6 +24,21 @@
 - 패턴: 파일명 불일치로 인해 다른 개발자가 `gpt-client.ts`에 대한 테스트가 이미 있다고 오해할 수 있다. Epic 2부터 새 테스트 파일명은 반드시 실제 테스트 대상 파일명과 동일하게(예: `gpt-retry.test.ts`) 짓는다.
 - 예방: 테스트 파일 생성 시 `tests/<실제-모듈명>.test.ts` 규칙 준수. 여러 모듈을 테스트하면 `tests/<feature>.test.ts`로 명시적 명칭 사용.
 
+### Rule 5: Route Handler는 HTTP 경계에서 반드시 Zod 검증을 수행하라
+- 발생: Epic 2, `analyze-columns/route.ts` (타입 단언만 사용), `sessions/route.ts` (`as unknown as never` 캐스트)
+- 패턴: Route Handler가 Zod `safeParse` 없이 타입 단언만으로 요청 본문을 내부 함수에 전달했다. 잘못된 JSON이나 필드 누락 요청이 내부 함수까지 도달해 런타임 에러로 이어진다. Epic 3 분류 API에서 같은 실수가 반복될 가능성이 높다.
+- 예방: `POST/PATCH/PUT` Route Handler의 첫 번째 단계는 항상 `RequestBodySchema.safeParse(rawBody)` 실행 후 실패 시 `throw new ApiError("...", 400)`. 타입 단언으로 이 단계를 건너뛰지 않는다.
+
+### Rule 6: 서버 전용 모듈은 `import 'server-only'`를 선언하고 클라이언트에서 직접 import하지 마라
+- 발생: Epic 2, `session-start.ts`(가드 누락) + `upload-workspace.tsx`(클라이언트에서 서버 함수 직접 호출)
+- 패턴: `"use client"` 컴포넌트가 서버 전용 함수를 직접 import해 DB 스키마 타입이 클라이언트 번들에 포함됐다. `import 'server-only'` 가드가 없으면 TypeScript 빌드에서 차단되지 않아 문제가 런타임까지 숨겨진다.
+- 예방: DB 스키마·Supabase·OpenAI에 의존하는 파일은 첫 줄에 `import 'server-only'` 추가. 클라이언트 컴포넌트는 데이터를 Route Handler(`/api`) 경유로만 주고받아야 하며, 서버 함수를 직접 import하지 않는다.
+
+### Rule 7: 아키텍처 명세의 경로를 코드에 그대로 사용하라
+- 발생: Epic 2, Story 2.1 `upload-workspace.tsx` — `/template/취소사유분析기_양식.xlsx` vs. 명세 `/templates/cancellation-template.xlsx`
+- 패턴: Story Dev Notes에 두 경로가 동시에 기재되어 개발자가 잘못된 쪽을 구현했다. `architecture-rules.md`에 명시된 경로와 다른 경로를 사용하면 런타임 404가 발생한다.
+- 예방: 정적 파일 경로·API 경로는 `architecture-rules.md`를 유일한 원본으로 취급하고 복붙할 것. Dev Notes에서 임의로 경로를 재표기하지 않는다.
+
 ## Archived Rules
 
 <!-- 해결되거나 더 이상 관련 없는 규칙은 여기로 이동 -->

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 import { useToast } from "@/components/ui/use-toast";
-import { shouldRedirectToUpload } from "@/shared/session/session-guard";
+import { SESSION_ID_STORAGE_KEY, shouldRedirectToUpload } from "@/shared/session/session-guard";
 
 export function SessionGuard({ children }: Readonly<{ children: React.ReactNode }>) {
   const pathname = usePathname();
@@ -13,7 +13,7 @@ export function SessionGuard({ children }: Readonly<{ children: React.ReactNode 
   const [isAllowed, setIsAllowed] = useState(false);
 
   useEffect(() => {
-    const sessionId = window.localStorage.getItem("session_id");
+    const sessionId = window.localStorage.getItem(SESSION_ID_STORAGE_KEY);
 
     if (shouldRedirectToUpload(pathname, sessionId)) {
       toast({

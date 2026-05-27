@@ -1,3 +1,5 @@
+export const SESSION_ID_STORAGE_KEY = "session_id";
+
 const PROTECTED_PATH_PREFIXES = ["/analyzing", "/result"] as const;
 
 export function shouldRedirectToUpload(pathname: string, sessionId: string | null) {
