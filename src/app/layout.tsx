@@ -4,6 +4,7 @@ import "@fontsource/pretendard/500.css";
 import "@fontsource/pretendard/600.css";
 
 import "@/app/globals.css";
+import { AppFrame } from "@/components/app-frame";
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
@@ -15,7 +16,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="ko">
       <body className="bg-canvas font-sans text-body text-charcoal antialiased">
-        {children}
+        <AppFrame>{children}</AppFrame>
         <Toaster />
       </body>
     </html>

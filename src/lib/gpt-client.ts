@@ -3,13 +3,13 @@ import "server-only";
 import OpenAI from "openai";
 
 import { runWithGptRetry, type GptRetryOptions } from "@/lib/gpt-retry";
-import { readServerEnv } from "@/shared/env/server";
+import { readOpenAiEnv } from "@/shared/env/server";
 
 let openAiClient: OpenAI | undefined;
 
 export function getOpenAiClient() {
   if (!openAiClient) {
-    const env = readServerEnv();
+    const env = readOpenAiEnv();
     openAiClient = new OpenAI({ apiKey: env.OPENAI_API_KEY });
   }
 
@@ -21,7 +21,7 @@ export async function runOpenAiJsonRequest(
   options: GptRetryOptions = {},
 ) {
   const client = getOpenAiClient();
-  const env = readServerEnv();
+  const env = readOpenAiEnv();
 
   return runWithGptRetry(
     () =>

@@ -1,3 +1,9 @@
 import "server-only";
 
-export { readServerEnv, type ServerEnv } from "@/shared/env/read-server-env";
+export {
+  readOpenAiEnv,
+  readServerEnv,
+  readSupabaseEnv,
+  type OpenAiServerEnv,
+  type SupabaseServerEnv,
+} from "@/shared/env/read-server-env";
