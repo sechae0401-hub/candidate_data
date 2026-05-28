@@ -1,12 +1,19 @@
 "use client";
 
-import { RefreshCw } from "lucide-react";
+import { Copy, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
+import {
+  buildNewCategorySummary,
+  buildNotionMarkdown,
+  canCopyToNotion,
+  parseStoredInsightSummary,
+  type NewCategoryDisplayItem,
+} from "@/result/notion-export";
 import { SESSION_ID_STORAGE_KEY } from "@/shared/session/session-guard";
 import {
   buildInterviewSummary,
@@ -77,6 +84,32 @@ function displayValue(value: string | null) {
   return value?.trim() || "-";
 }
 
+async function copyTextToClipboard(text: string) {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return;
+    } catch {
+      // Continue to the textarea fallback below.
+    }
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  document.body.appendChild(textarea);
+  textarea.select();
+
+  const didCopy = document.execCommand("copy");
+  document.body.removeChild(textarea);
+
+  if (!didCopy) {
+    throw new Error("Clipboard copy failed");
+  }
+}
+
 function ResultStatusBadge({ row }: { row: ResultRowSummary }) {
   const state = getResultReviewState(row);
 
@@ -97,12 +130,24 @@ export function ResultWorkspace() {
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
   const [editingCell, setEditingCell] = useState<{ rowId: string; field: EditableResultField } | null>(null);
   const [draftValue, setDraftValue] = useState("");
+  const [isCopying, setIsCopying] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
   const summary = useMemo(() => calculateResultSummary(rows), [rows]);
   const selectedRow = useMemo(() => rows.find((row) => row.id === selectedRowId) ?? null, [rows, selectedRowId]);
+  const insight = useMemo(() => parseStoredInsightSummary(data?.session.insight_summary ?? null), [data?.session.insight_summary]);
+  const newCategoryItems = useMemo<NewCategoryDisplayItem[]>(
+    () =>
+      (data?.newCategories ?? []).map((category) => ({
+        categoryName: category.category_name,
+        occurrenceCount: category.occurrence_count,
+      })),
+    [data?.newCategories],
+  );
+  const newCategorySummary = useMemo(() => buildNewCategorySummary(newCategoryItems), [newCategoryItems]);
+  const copyEnabled = canCopyToNotion(summary);
 
   const saveRowPatch = useCallback(
     async (rowId: string, patch: ResultRowPatch) => {
@@ -204,6 +249,36 @@ export function ResultWorkspace() {
       setIsLoading(false);
     }
   }, []);
+
+  const copyNotionMarkdown = useCallback(async () => {
+    if (!data || !copyEnabled) {
+      return;
+    }
+
+    setIsCopying(true);
+
+    try {
+      await copyTextToClipboard(
+        buildNotionMarkdown({
+          rows,
+          insight,
+          cohortName: data.session.cohort_name,
+        }),
+      );
+      toast({
+        title: "복사되었습니다",
+        description: "노션에 바로 붙여넣을 수 있는 형식으로 복사했습니다.",
+      });
+    } catch {
+      toast({
+        title: "복사 실패",
+        description: "HTTPS 환경에서만 복사가 지원됩니다. 브라우저 권한을 확인해 주세요.",
+        variant: "error",
+      });
+    } finally {
+      setIsCopying(false);
+    }
+  }, [copyEnabled, data, insight, rows, toast]);
 
   useEffect(() => {
     void loadResult();
@@ -365,6 +440,68 @@ export function ResultWorkspace() {
           </div>
 
           <OriginalSourcePanel selectedRow={selectedRow} />
+        </section>
+
+        <section className="flex flex-col gap-4">
+          <div className="rounded-lg border border-hairline bg-surface p-5">
+            <div className="flex flex-col gap-1">
+              <p className="text-heading-sub text-ink">인사이트</p>
+              <p className="text-caption text-slate">AI가 생성한 참고용 요약입니다.</p>
+            </div>
+
+            <div className="mt-5 grid gap-5 lg:grid-cols-3">
+              <section>
+                <p className="text-badge text-slate">인사이트 요약</p>
+                <p className="mt-2 text-body text-charcoal">{insight.summary}</p>
+              </section>
+
+              <section>
+                <p className="text-badge text-slate">운영 추천 액션</p>
+                {insight.recommendedActions.length > 0 ? (
+                  <ol className="mt-2 list-decimal space-y-2 pl-5 text-body text-charcoal">
+                    {insight.recommendedActions.map((action) => (
+                      <li key={action}>{action}</li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p className="mt-2 text-body text-slate">추천 액션이 없습니다.</p>
+                )}
+              </section>
+
+              <section>
+                <p className="text-badge text-slate">이전 기수 비교</p>
+                {insight.cohortComparison.notice ? (
+                  <p className="mt-2 text-body text-charcoal">{insight.cohortComparison.notice}</p>
+                ) : (
+                  <ul className="mt-2 space-y-2 text-body text-charcoal">
+                    {insight.cohortComparison.comparisons.map((item) => (
+                      <li key={item.primaryCause}>
+                        {item.primaryCause} {item.currentPercentage}% → 이전 평균 {item.previousAveragePercentage}% (
+                        {item.deltaPercentagePoints > 0 ? "+" : ""}
+                        {item.deltaPercentagePoints}%p)
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            </div>
+          </div>
+
+          {newCategorySummary ? (
+            <p className="rounded-lg border border-hairline bg-white px-5 py-4 text-body text-charcoal">
+              {newCategorySummary}
+            </p>
+          ) : null}
+
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-caption text-slate">
+              {copyEnabled ? "검토가 완료되어 노션 형식으로 복사할 수 있습니다." : "검토 필요 행을 모두 완료하면 복사할 수 있습니다."}
+            </p>
+            <Button type="button" disabled={!copyEnabled || isCopying} onClick={() => void copyNotionMarkdown()}>
+              <Copy className="mr-2 h-4 w-4" />
+              노션 형식 복사
+            </Button>
+          </div>
         </section>
       </div>
     </main>
