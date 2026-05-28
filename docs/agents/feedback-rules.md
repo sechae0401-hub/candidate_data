@@ -30,14 +30,29 @@
 - 예방: `POST/PATCH/PUT` Route Handler의 첫 번째 단계는 항상 `RequestBodySchema.safeParse(rawBody)` 실행 후 실패 시 `throw new ApiError("...", 400)`. 타입 단언으로 이 단계를 건너뛰지 않는다.
 
 ### Rule 6: 서버 전용 모듈은 `import 'server-only'`를 선언하고 클라이언트에서 직접 import하지 마라
-- 발생: Epic 2, `session-start.ts`(가드 누락) + `upload-workspace.tsx`(클라이언트에서 서버 함수 직접 호출)
-- 패턴: `"use client"` 컴포넌트가 서버 전용 함수를 직접 import해 DB 스키마 타입이 클라이언트 번들에 포함됐다. `import 'server-only'` 가드가 없으면 TypeScript 빌드에서 차단되지 않아 문제가 런타임까지 숨겨진다.
-- 예방: DB 스키마·Supabase·OpenAI에 의존하는 파일은 첫 줄에 `import 'server-only'` 추가. 클라이언트 컴포넌트는 데이터를 Route Handler(`/api`) 경유로만 주고받아야 하며, 서버 함수를 직접 import하지 않는다.
+- 발생: Epic 2 + Epic 3 반복 (`session-start.ts` 동일 파일에서 Epic 2, Epic 3 연속 CRITICAL 판정)
+- 패턴: `"use client"` 컴포넌트가 서버 전용 함수를 직접 import해 DB 스키마 타입이 클라이언트 번들에 포함됐다. `import 'server-only'` 가드가 없으면 TypeScript 빌드에서 차단되지 않아 문제가 런타임까지 숨겨진다. Codex가 파일을 수정할 때 이 import를 불필요한 것으로 판단해 삭제하는 패턴이 반복되고 있다.
+- 예방: DB 스키마·Supabase·OpenAI에 의존하는 파일은 첫 줄에 `import 'server-only'` 추가. 절대 삭제하지 않는다. 클라이언트 컴포넌트는 데이터를 Route Handler(`/api`) 경유로만 주고받아야 하며, 서버 함수를 직접 import하지 않는다.
 
 ### Rule 7: 아키텍처 명세의 경로를 코드에 그대로 사용하라
 - 발생: Epic 2, Story 2.1 `upload-workspace.tsx` — `/template/취소사유분析기_양식.xlsx` vs. 명세 `/templates/cancellation-template.xlsx`
 - 패턴: Story Dev Notes에 두 경로가 동시에 기재되어 개발자가 잘못된 쪽을 구현했다. `architecture-rules.md`에 명시된 경로와 다른 경로를 사용하면 런타임 404가 발생한다.
 - 예방: 정적 파일 경로·API 경로는 `architecture-rules.md`를 유일한 원본으로 취급하고 복붙할 것. Dev Notes에서 임의로 경로를 재표기하지 않는다.
+
+### Rule 8: 브라우저 기본 confirm/alert/prompt 사용 금지 — shadcn/ui AlertDialog로 대체하라
+- 발생: Epic 3, Story 3.4 `analyzing-workspace.tsx`
+- 패턴: 취소 확인 팝업을 `window.confirm()`으로 구현했다. 스레드 블로킹, VoiceOver/NVDA 접근성 미흡, 스타일 커스터마이징 불가, shadcn/ui 컴포넌트 시스템과 불일치 등 4가지 문제가 동시에 발생한다.
+- 예방: 사용자 확인이 필요한 모든 팝업은 `shadcn/ui AlertDialog`를 사용한다. `window.confirm/alert/prompt`는 코드베이스 어디에도 사용하지 않는다.
+
+### Rule 9: Supabase `select("*")` 금지 — 필요한 컬럼만 명시적으로 select하라
+- 발생: Epic 3, Story 3.4 `src/app/api/result/[sessionId]/route.ts`
+- 패턴: `sessions.select("*")`로 전체 컬럼을 클라이언트에 반환했다. `insight_summary`(대용량 JSON), `service_role_key` 관련 내부 메타데이터가 포함될 수 있어 최소 권한 원칙 위반이다. 네트워크 비용도 불필요하게 증가한다.
+- 예방: 모든 Supabase 쿼리에서 필요한 컬럼만 명시적으로 `.select("id, status, ...")` 형식으로 나열한다. `select("*")`는 코드 리뷰에서 즉시 IMPORTANT 이슈로 처리한다.
+
+### Rule 10: 모듈 간 공유 타입·상수는 `src/shared/types/`로 먼저 이동하라
+- 발생: Epic 3, Story 3.1/3.4 `analyzing-workspace.tsx`가 `@/upload/classification-draft`를 직접 import (CRITICAL 판정)
+- 패턴: `classify` 모듈이 `upload` 모듈의 타입(`ClassificationDraft`, `CLASSIFICATION_DRAFT_STORAGE_KEY`)을 직접 import했다. `architecture-rules.md`에 "upload ↔ classify ↔ result 간 직접 import 금지"가 명시되어 있지만 무시됐다. 타입을 어느 모듈에 두어야 할지 불명확할 때 가장 많이 발생한다.
+- 예방: 2개 이상의 기능 모듈에서 사용하는 타입·상수는 처음부터 `src/shared/types/<feature>.ts`에 정의한다. 특정 모듈 파일에 둔 타입을 다른 모듈에서 import하려는 순간 즉시 `src/shared/`로 이동한다.
 
 ## Archived Rules
 
