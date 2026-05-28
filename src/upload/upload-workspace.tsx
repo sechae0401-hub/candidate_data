@@ -181,11 +181,14 @@ export function UploadWorkspace() {
 
       console.error("Column analysis failed:", error);
 
-      const fallbackMessage = "AI 분석 중 오류가 발생했습니다. 다시 시도해 주세요";
-      setAnalysisError(fallbackMessage);
+      const message =
+        error instanceof Error
+          ? error.message
+          : "AI 분석 중 오류가 발생했습니다. 다시 시도해 주세요";
+      setAnalysisError(message);
       toast({
         title: "AI 분석을 완료하지 못했습니다",
-        description: fallbackMessage,
+        description: message,
         variant: "error",
       });
     } finally {

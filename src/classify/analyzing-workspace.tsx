@@ -174,7 +174,11 @@ export function AnalyzingWorkspace() {
       } catch (error) {
         console.error("Insight request failed:", error);
         setStage("failed");
-        setErrorMessage("분류를 완료하지 못했습니다. 다시 시도해 주세요");
+        const message =
+          error instanceof Error
+            ? error.message
+            : "분류를 완료하지 못했습니다. 다시 시도해 주세요";
+        setErrorMessage(message);
       }
     },
     [router],
@@ -214,7 +218,8 @@ export function AnalyzingWorkspace() {
       isCancelledRef.current = false;
       toast({
         title: "분류를 취소하지 못했습니다",
-        description: "잠시 후 다시 시도해 주세요.",
+        description:
+          error instanceof Error ? error.message : "잠시 후 다시 시도해 주세요.",
         variant: "error",
       });
     } finally {

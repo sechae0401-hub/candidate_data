@@ -2,7 +2,10 @@ import { z } from "zod";
 
 import { ApiError } from "@/lib/api-handler";
 
-const UploadRowRecordSchema = z.record(z.string().max(200), z.string().max(500));
+const UploadRowRecordSchema = z.record(
+  z.string().max(200),
+  z.preprocess((val) => (typeof val === "string" ? val : String(val ?? "")), z.string()),
+);
 
 export const AnalyzeColumnsRequestSchema = z.object({
   columns: z.array(z.string().trim().min(1)).min(1),
@@ -25,13 +28,23 @@ type OpenAiTextResponse = {
   output_text?: string | null;
 };
 
+const SAMPLE_VALUE_MAX = 200;
+
 function formatSampleRows(sampleRows: AnalyzeColumnsRequest["sampleRows"]) {
   if (sampleRows.length === 0) {
     return "샘플 행 없음";
   }
 
   return sampleRows
-    .map((row, index) => `행 ${index + 1}: ${JSON.stringify(row, null, 2)}`)
+    .map((row, index) => {
+      const truncated = Object.fromEntries(
+        Object.entries(row).map(([k, v]) => [
+          k,
+          v.length > SAMPLE_VALUE_MAX ? `${v.slice(0, SAMPLE_VALUE_MAX)}…` : v,
+        ]),
+      );
+      return `행 ${index + 1}: ${JSON.stringify(truncated, null, 2)}`;
+    })
     .join("\n");
 }
 

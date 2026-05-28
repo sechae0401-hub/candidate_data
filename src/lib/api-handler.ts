@@ -23,10 +23,13 @@ function normalizeErrorMessage(error: unknown, fallbackMessage: string) {
 
   console.error("Unhandled API error:", error);
 
-  return {
-    message: fallbackMessage,
-    statusCode: 500,
-  };
+  const detail = error instanceof Error ? error.message : String(error);
+  const message =
+    process.env.NODE_ENV === "development"
+      ? `${fallbackMessage} (${detail})`
+      : fallbackMessage;
+
+  return { message, statusCode: 500 };
 }
 
 export function createErrorResponse(message: string, status = 500) {
