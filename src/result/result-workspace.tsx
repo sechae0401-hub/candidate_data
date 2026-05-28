@@ -1,6 +1,7 @@
 "use client";
 
-import { Copy, RefreshCw } from "lucide-react";
+import { Copy, RefreshCw, RotateCcw, X } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +15,9 @@ import {
   parseStoredInsightSummary,
   type NewCategoryDisplayItem,
 } from "@/result/notion-export";
+import { getResultActionModes } from "@/result/result-actions";
 import { SESSION_ID_STORAGE_KEY } from "@/shared/session/session-guard";
+import { CLASSIFICATION_DRAFT_STORAGE_KEY } from "@/shared/types/classification-draft";
 import {
   buildInterviewSummary,
   calculateResultSummary,
@@ -125,12 +128,14 @@ function getEditableValue(row: ResultRowSummary, field: EditableResultField) {
 }
 
 export function ResultWorkspace() {
+  const router = useRouter();
   const [data, setData] = useState<ResultApiPayload | null>(null);
   const [rows, setRows] = useState<ResultRowSummary[]>([]);
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
   const [editingCell, setEditingCell] = useState<{ rowId: string; field: EditableResultField } | null>(null);
   const [draftValue, setDraftValue] = useState("");
   const [isCopying, setIsCopying] = useState(false);
+  const [hasCopiedToNotion, setHasCopiedToNotion] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
@@ -148,6 +153,7 @@ export function ResultWorkspace() {
   );
   const newCategorySummary = useMemo(() => buildNewCategorySummary(newCategoryItems), [newCategoryItems]);
   const copyEnabled = canCopyToNotion(summary);
+  const actionModes = getResultActionModes(hasCopiedToNotion);
 
   const saveRowPatch = useCallback(
     async (rowId: string, patch: ResultRowPatch) => {
@@ -269,6 +275,7 @@ export function ResultWorkspace() {
         title: "복사되었습니다",
         description: "노션에 바로 붙여넣을 수 있는 형식으로 복사했습니다.",
       });
+      setHasCopiedToNotion(true);
     } catch {
       toast({
         title: "복사 실패",
@@ -279,6 +286,12 @@ export function ResultWorkspace() {
       setIsCopying(false);
     }
   }, [copyEnabled, data, insight, rows, toast]);
+
+  const startNewClassification = useCallback(() => {
+    window.localStorage.removeItem(SESSION_ID_STORAGE_KEY);
+    window.localStorage.removeItem(CLASSIFICATION_DRAFT_STORAGE_KEY);
+    router.push("/upload");
+  }, [router]);
 
   useEffect(() => {
     void loadResult();
@@ -439,7 +452,7 @@ export function ResultWorkspace() {
           </div>
           </div>
 
-          <OriginalSourcePanel selectedRow={selectedRow} />
+          <OriginalSourcePanel selectedRow={selectedRow} onClose={() => setSelectedRowId(null)} />
         </section>
 
         <section className="flex flex-col gap-4">
@@ -493,14 +506,30 @@ export function ResultWorkspace() {
             </p>
           ) : null}
 
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-caption text-slate">
               {copyEnabled ? "검토가 완료되어 노션 형식으로 복사할 수 있습니다." : "검토 필요 행을 모두 완료하면 복사할 수 있습니다."}
             </p>
-            <Button type="button" disabled={!copyEnabled || isCopying} onClick={() => void copyNotionMarkdown()}>
-              <Copy className="mr-2 h-4 w-4" />
-              노션 형식 복사
-            </Button>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button
+                type="button"
+                variant={actionModes.copyButtonVariant}
+                disabled={!copyEnabled || isCopying}
+                onClick={() => void copyNotionMarkdown()}
+              >
+                <Copy className="mr-2 h-4 w-4" />
+                노션 형식 복사
+              </Button>
+              <Button
+                type="button"
+                variant={actionModes.newStartButtonVariant}
+                className={cn(hasCopiedToNotion && "ring-2 ring-ink ring-offset-2")}
+                onClick={startNewClassification}
+              >
+                <RotateCcw className="mr-2 h-4 w-4" />
+                새 분류 시작
+              </Button>
+            </div>
           </div>
         </section>
       </div>
@@ -568,10 +597,10 @@ function EditableCell({
   );
 }
 
-function OriginalSourcePanel({ selectedRow }: { selectedRow: ResultRowSummary | null }) {
+function OriginalSourcePanel({ selectedRow, onClose }: { selectedRow: ResultRowSummary | null; onClose: () => void }) {
   if (!selectedRow) {
     return (
-      <aside className="rounded-xl border border-hairline bg-white p-6">
+      <aside className="hidden rounded-xl border border-hairline bg-white p-6 lg:block">
         <p className="text-heading-sub text-ink">원문</p>
         <p className="mt-2 text-body text-slate">행을 선택하면 인터뷰 내용과 특이사항 전문이 표시됩니다.</p>
       </aside>
@@ -579,10 +608,20 @@ function OriginalSourcePanel({ selectedRow }: { selectedRow: ResultRowSummary | 
   }
 
   return (
-    <aside className="rounded-xl border border-hairline bg-white p-6 lg:sticky lg:top-24 lg:self-start">
+    <aside className="fixed inset-x-0 bottom-0 z-50 max-h-[72vh] overflow-y-auto rounded-t-xl border border-hairline bg-white p-6 shadow-sm lg:sticky lg:inset-auto lg:top-24 lg:z-auto lg:max-h-none lg:self-start lg:rounded-xl lg:shadow-none">
       <div className="flex items-center justify-between gap-3">
         <p className="text-heading-sub text-ink">원문</p>
-        <Badge>행 {selectedRow.rowIndex}</Badge>
+        <div className="flex items-center gap-2">
+          <Badge>행 {selectedRow.rowIndex}</Badge>
+          <button
+            type="button"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-hairline text-slate lg:hidden"
+            onClick={onClose}
+            aria-label="원문 패널 닫기"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
       <div className="mt-6 flex flex-col gap-6">
