@@ -20,7 +20,11 @@ export async function POST(request: Request) {
 
       const classification = await classifyRows(parsed.data, runOpenAiJsonRequest);
       const supabase = getSupabaseServerClient();
-      const resultPayloads = buildClassificationResultInsertPayloads(parsed.data.sessionId, classification.results);
+      const resultPayloads = buildClassificationResultInsertPayloads(
+        parsed.data.sessionId,
+        classification.results,
+        parsed.data.rows,
+      );
 
       const { error: resultError } = await supabase.from("classification_results").insert(resultPayloads as never);
 

@@ -9,13 +9,16 @@ export interface Database {
           created_at: string;
           detail_tags: string | null;
           id: string;
+          interview_content: string | null;
           needs_review: boolean;
+          notes: string | null;
           primary_cause: string | null;
           reasoning: string | null;
           review_completed: boolean;
           row_index: number;
           secondary_action: string | null;
           session_id: string;
+          source_snapshot: Json | null;
           updated_at: string;
         };
         Insert: {
@@ -23,13 +26,16 @@ export interface Database {
           created_at?: string;
           detail_tags?: string | null;
           id?: string;
+          interview_content?: string | null;
           needs_review?: boolean;
+          notes?: string | null;
           primary_cause?: string | null;
           reasoning?: string | null;
           review_completed?: boolean;
           row_index: number;
           secondary_action?: string | null;
           session_id: string;
+          source_snapshot?: Json | null;
           updated_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["classification_results"]["Insert"]>;

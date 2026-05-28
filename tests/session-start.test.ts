@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { buildSessionInsertPayload } from "../src/upload/session-start";
+import { buildSessionInsertPayload } from "../src/upload/session-start-payload";
 
 test("buildSessionInsertPayload normalizes cohort name and selected values", () => {
   const payload = buildSessionInsertPayload({

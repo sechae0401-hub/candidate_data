@@ -196,10 +196,16 @@ export async function classifyRows(
 export function buildClassificationResultInsertPayloads(
   sessionId: string,
   results: ClassificationResult[],
+  rows: ClassifyRow[] = [],
 ): Database["public"]["Tables"]["classification_results"]["Insert"][] {
+  const rowsByIndex = new Map(rows.map((row) => [row.rowIndex, row]));
+
   return results.map((result) => ({
     session_id: sessionId,
     row_index: result.rowIndex,
+    interview_content: rowsByIndex.get(result.rowIndex)?.interviewContent ?? null,
+    notes: rowsByIndex.get(result.rowIndex)?.notes ?? null,
+    source_snapshot: rowsByIndex.get(result.rowIndex)?.source ?? null,
     primary_cause: result.primaryCause,
     secondary_action: result.secondaryAction,
     detail_tags: result.detailTags,

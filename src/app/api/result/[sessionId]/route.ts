@@ -23,7 +23,7 @@ export async function GET(_request: Request, { params }: { params: { sessionId: 
       const { data: results, error: resultsError } = await supabase
         .from("classification_results")
         .select(
-          "id, session_id, row_index, primary_cause, secondary_action, detail_tags, competing_course, reasoning, needs_review, review_completed",
+          "id, session_id, row_index, interview_content, notes, source_snapshot, primary_cause, secondary_action, detail_tags, competing_course, reasoning, needs_review, review_completed",
         )
         .eq("session_id", params.sessionId)
         .order("row_index", { ascending: true });
