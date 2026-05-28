@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { ColumnAnalysisItem } from "@/upload/column-analysis";
+import { buildClassificationDraft, CLASSIFICATION_DRAFT_STORAGE_KEY } from "@/upload/classification-draft";
 import { formatWorkbookSummary, getWorkbookFileError } from "@/upload/file-acceptance";
 import { parseWorkbookFile } from "@/upload/parse-workbook";
 import { countRowsForSelectedResultValues, getResultValueOptions } from "@/upload/result-selection";
@@ -202,13 +203,14 @@ export function UploadWorkspace() {
     setIsCreatingSession(true);
 
     try {
+      const normalizedCohortName = cohortName.trim() || null;
       const response = await fetch("/api/sessions", {
         method: "POST",
         headers: {
           "content-type": "application/json",
         },
         body: JSON.stringify({
-          cohortName: cohortName.trim() || null,
+          cohortName: normalizedCohortName,
           totalRows: snapshot.totalRows,
           excludedRows: snapshot.totalRows - selectedRowCount,
           selectedResultValues,
@@ -220,7 +222,15 @@ export function UploadWorkspace() {
         throw new Error(payload.error ?? "분류 세션을 만들지 못했습니다.");
       }
 
+      const classificationDraft = buildClassificationDraft({
+        sessionId: payload.sessionId,
+        cohortName: normalizedCohortName,
+        selectedResultValues,
+        snapshot,
+      });
+
       window.localStorage.setItem(SESSION_ID_STORAGE_KEY, payload.sessionId);
+      window.localStorage.setItem(CLASSIFICATION_DRAFT_STORAGE_KEY, JSON.stringify(classificationDraft));
       toast({
         title: "분류 세션을 준비했습니다",
         description: `분류 대상 ${selectedRowCount}건으로 다음 단계로 이동합니다.`,

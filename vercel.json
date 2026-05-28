@@ -1,4 +1,9 @@
 {
+  "functions": {
+    "src/app/api/classify/route.ts": {
+      "maxDuration": 9
+    }
+  },
   "crons": [
     {
       "path": "/api/ping",
