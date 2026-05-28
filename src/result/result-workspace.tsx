@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
 import { SESSION_ID_STORAGE_KEY } from "@/shared/session/session-guard";
 import {
@@ -13,6 +14,13 @@ import {
   getResultReviewState,
   type ResultRowSummary,
 } from "@/result/result-summary";
+import {
+  applyResultRowPatch,
+  buildEditableFieldPatch,
+  buildReviewStatePatch,
+  type EditableResultField,
+  type ResultRowPatch,
+} from "@/result/result-update";
 
 interface ResultSessionPayload {
   id: string;
@@ -79,13 +87,92 @@ function ResultStatusBadge({ row }: { row: ResultRowSummary }) {
   return <Badge variant="done">완료</Badge>;
 }
 
+function getEditableValue(row: ResultRowSummary, field: EditableResultField) {
+  return row[field] ?? "";
+}
+
 export function ResultWorkspace() {
   const [data, setData] = useState<ResultApiPayload | null>(null);
+  const [rows, setRows] = useState<ResultRowSummary[]>([]);
+  const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
+  const [editingCell, setEditingCell] = useState<{ rowId: string; field: EditableResultField } | null>(null);
+  const [draftValue, setDraftValue] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
 
-  const rows = useMemo(() => (data?.results ?? []).map(mapResultRow), [data?.results]);
   const summary = useMemo(() => calculateResultSummary(rows), [rows]);
+  const selectedRow = useMemo(() => rows.find((row) => row.id === selectedRowId) ?? null, [rows, selectedRowId]);
+
+  const saveRowPatch = useCallback(
+    async (rowId: string, patch: ResultRowPatch) => {
+      if (!data) {
+        return;
+      }
+
+      const previousRows = rows;
+
+      setRows((currentRows) =>
+        currentRows.map((row) => (row.id === rowId ? applyResultRowPatch(row, patch) : row)),
+      );
+
+      try {
+        const response = await fetch(`/api/result/${data.session.id}/update`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            resultId: rowId,
+            ...patch,
+          }),
+        });
+
+        if (!response.ok) {
+          const payload = (await response.json()) as { error?: string };
+          throw new Error(payload.error ?? "수정 내용을 저장하지 못했습니다.");
+        }
+      } catch {
+        setRows(previousRows);
+        toast({
+          title: "저장 실패",
+          description: "수정 내용을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요",
+          variant: "error",
+        });
+      }
+    },
+    [data, rows, toast],
+  );
+
+  const startEditing = useCallback((row: ResultRowSummary, field: EditableResultField) => {
+    setSelectedRowId(row.id);
+    setEditingCell({ rowId: row.id, field });
+    setDraftValue(getEditableValue(row, field));
+  }, []);
+
+  const cancelEditing = useCallback(() => {
+    setEditingCell(null);
+    setDraftValue("");
+  }, []);
+
+  const commitEditing = useCallback(async () => {
+    if (!editingCell) {
+      return;
+    }
+
+    const { rowId, field } = editingCell;
+    const currentRow = rows.find((row) => row.id === rowId);
+    const previousValue = currentRow ? getEditableValue(currentRow, field).trim() : "";
+    const nextValue = draftValue.trim();
+
+    cancelEditing();
+
+    if (previousValue === nextValue) {
+      return;
+    }
+
+    await saveRowPatch(rowId, buildEditableFieldPatch(field, draftValue));
+  }, [cancelEditing, draftValue, editingCell, rows, saveRowPatch]);
 
   const loadResult = useCallback(async () => {
     const sessionId = window.localStorage.getItem(SESSION_ID_STORAGE_KEY);
@@ -105,7 +192,12 @@ export function ResultWorkspace() {
         throw new Error("error" in payload ? payload.error : "분류 결과를 불러오지 못했습니다.");
       }
 
-      setData(payload as ResultApiPayload);
+      const nextData = payload as ResultApiPayload;
+      const nextRows = nextData.results.map(mapResultRow);
+
+      setData(nextData);
+      setRows(nextRows);
+      setSelectedRowId((currentSelectedRowId) => currentSelectedRowId ?? nextRows[0]?.id ?? null);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "분류 결과를 불러오지 못했습니다.");
     } finally {
@@ -173,7 +265,8 @@ export function ResultWorkspace() {
           <Badge variant="done">완료 {summary.completedCount}건</Badge>
         </section>
 
-        <section className="overflow-hidden rounded-xl border border-hairline bg-white">
+        <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="overflow-hidden rounded-xl border border-hairline bg-white">
           <div className="overflow-x-auto">
             <table className="min-w-[1040px] w-full border-collapse text-table">
               <thead className="bg-surface text-left text-badge text-slate">
@@ -195,8 +288,10 @@ export function ResultWorkspace() {
                   return (
                     <tr
                       key={row.id}
+                      onClick={() => setSelectedRowId(row.id)}
                       className={cn(
-                        "h-12 border-b border-hairline-soft border-l-4 text-charcoal",
+                        "h-12 cursor-pointer border-b border-hairline-soft border-l-4 text-charcoal transition-colors",
+                        selectedRowId === row.id && "outline outline-2 outline-offset-[-2px] outline-ink",
                         state === "review"
                           ? "border-l-status-review bg-status-review-soft"
                           : "border-l-status-done bg-status-done-soft",
@@ -207,13 +302,40 @@ export function ResultWorkspace() {
                         <span className="block truncate">{buildInterviewSummary(row)}</span>
                       </td>
                       <td className="max-w-[140px] px-4 py-3">
-                        <span className="block truncate">{displayValue(row.primaryCause)}</span>
+                        <EditableCell
+                          field="primaryCause"
+                          row={row}
+                          editingCell={editingCell}
+                          draftValue={draftValue}
+                          onCancel={cancelEditing}
+                          onCommit={commitEditing}
+                          onDraftChange={setDraftValue}
+                          onStartEditing={startEditing}
+                        />
                       </td>
                       <td className="max-w-[140px] px-4 py-3">
-                        <span className="block truncate">{displayValue(row.secondaryAction)}</span>
+                        <EditableCell
+                          field="secondaryAction"
+                          row={row}
+                          editingCell={editingCell}
+                          draftValue={draftValue}
+                          onCancel={cancelEditing}
+                          onCommit={commitEditing}
+                          onDraftChange={setDraftValue}
+                          onStartEditing={startEditing}
+                        />
                       </td>
                       <td className="max-w-[140px] px-4 py-3">
-                        <span className="block truncate">{displayValue(row.detailTags)}</span>
+                        <EditableCell
+                          field="detailTags"
+                          row={row}
+                          editingCell={editingCell}
+                          draftValue={draftValue}
+                          onCancel={cancelEditing}
+                          onCommit={commitEditing}
+                          onDraftChange={setDraftValue}
+                          onStartEditing={startEditing}
+                        />
                       </td>
                       <td className="max-w-[120px] px-4 py-3">
                         <span className="block truncate">{displayValue(row.competingCourse)}</span>
@@ -222,7 +344,17 @@ export function ResultWorkspace() {
                         <span className="block truncate">{displayValue(row.reasoning)}</span>
                       </td>
                       <td className="whitespace-nowrap px-4 py-3">
-                        <ResultStatusBadge row={row} />
+                        <button
+                          type="button"
+                          className="inline-flex min-h-11 items-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            const nextState = state === "review" ? "done" : "review";
+                            void saveRowPatch(row.id, buildReviewStatePatch(nextState));
+                          }}
+                        >
+                          <ResultStatusBadge row={row} />
+                        </button>
                       </td>
                     </tr>
                   );
@@ -230,8 +362,107 @@ export function ResultWorkspace() {
               </tbody>
             </table>
           </div>
+          </div>
+
+          <OriginalSourcePanel selectedRow={selectedRow} />
         </section>
       </div>
     </main>
+  );
+}
+
+interface EditableCellProps {
+  row: ResultRowSummary;
+  field: EditableResultField;
+  editingCell: { rowId: string; field: EditableResultField } | null;
+  draftValue: string;
+  onCancel: () => void;
+  onCommit: () => void;
+  onDraftChange: (value: string) => void;
+  onStartEditing: (row: ResultRowSummary, field: EditableResultField) => void;
+}
+
+function EditableCell({
+  row,
+  field,
+  editingCell,
+  draftValue,
+  onCancel,
+  onCommit,
+  onDraftChange,
+  onStartEditing,
+}: EditableCellProps) {
+  const isEditing = editingCell?.rowId === row.id && editingCell.field === field;
+
+  if (isEditing) {
+    return (
+      <input
+        autoFocus
+        className="h-10 w-full rounded-md border border-hairline bg-white px-3 text-table text-ink outline-none focus:border-ink"
+        value={draftValue}
+        onBlur={() => void onCommit()}
+        onChange={(event) => onDraftChange(event.target.value)}
+        onClick={(event) => event.stopPropagation()}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.currentTarget.blur();
+          }
+
+          if (event.key === "Escape") {
+            event.stopPropagation();
+            onCancel();
+          }
+        }}
+      />
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className="block min-h-11 w-full truncate rounded-md text-left text-table text-charcoal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink"
+      onClick={(event) => {
+        event.stopPropagation();
+        onStartEditing(row, field);
+      }}
+    >
+      {displayValue(getEditableValue(row, field))}
+    </button>
+  );
+}
+
+function OriginalSourcePanel({ selectedRow }: { selectedRow: ResultRowSummary | null }) {
+  if (!selectedRow) {
+    return (
+      <aside className="rounded-xl border border-hairline bg-white p-6">
+        <p className="text-heading-sub text-ink">원문</p>
+        <p className="mt-2 text-body text-slate">행을 선택하면 인터뷰 내용과 특이사항 전문이 표시됩니다.</p>
+      </aside>
+    );
+  }
+
+  return (
+    <aside className="rounded-xl border border-hairline bg-white p-6 lg:sticky lg:top-24 lg:self-start">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-heading-sub text-ink">원문</p>
+        <Badge>행 {selectedRow.rowIndex}</Badge>
+      </div>
+
+      <div className="mt-6 flex flex-col gap-6">
+        <section>
+          <p className="text-badge text-slate">인터뷰 내용</p>
+          <p className="mt-2 whitespace-pre-wrap text-body text-charcoal">
+            {selectedRow.interviewContent?.trim() || "인터뷰 내용이 없습니다."}
+          </p>
+        </section>
+
+        <section>
+          <p className="text-badge text-slate">특이사항</p>
+          <p className="mt-2 whitespace-pre-wrap text-body text-charcoal">
+            {selectedRow.notes?.trim() || "특이사항이 없습니다."}
+          </p>
+        </section>
+      </div>
+    </aside>
   );
 }
