@@ -48,7 +48,11 @@ test("buildClassificationDraft rejects workbooks over 200 data rows", () => {
           firstSheetName: "Sheet1",
           columns: ["인터뷰내용", "특이사항", "최종결과"],
           totalRows: 201,
-          rows: [],
+          rows: Array.from({ length: 201 }, (_, i) => ({
+            인터뷰내용: `사유${i}`,
+            특이사항: "",
+            최종결과: "취소",
+          })),
         },
       }),
     /파일 크기\(또는 행 수\) 제한을 초과했습니다/,

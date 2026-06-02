@@ -20,6 +20,18 @@ export interface PrimaryCauseShare {
   percentage: number;
 }
 
+export interface SecondaryActionShare {
+  secondaryAction: string;
+  count: number;
+  percentage: number;
+}
+
+export interface CompetingCourseShare {
+  courseName: string;
+  count: number;
+  respondentPercentage: number;
+}
+
 export interface CohortComparisonItem {
   primaryCause: string;
   currentPercentage: number;
@@ -79,6 +91,55 @@ function calculateCausePercentageInCohort(results: Array<{ primaryCause: string 
   const count = results.filter((result) => normalizePrimaryCause(result.primaryCause) === primaryCause).length;
 
   return (count / results.length) * 100;
+}
+
+export function calculateTopSecondaryActionShares(
+  results: Array<{ secondaryAction: string | null }>,
+  limit = 5,
+): SecondaryActionShare[] {
+  const counts = new Map<string, number>();
+
+  for (const result of results) {
+    const action = result.secondaryAction?.trim();
+    if (action && action.length > 0) {
+      counts.set(action, (counts.get(action) ?? 0) + 1);
+    }
+  }
+
+  return [...counts.entries()]
+    .map(([secondaryAction, count]) => ({
+      secondaryAction,
+      count,
+      percentage: calculatePercentage(count, results.length),
+    }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, limit);
+}
+
+export function calculateCompetingCourseShares(
+  results: Array<{ competingCourse: string | null }>,
+): CompetingCourseShare[] {
+  const answered = results.filter((r) => {
+    const c = r.competingCourse?.trim();
+    return c && c.length > 0;
+  });
+
+  if (answered.length === 0) return [];
+
+  const counts = new Map<string, number>();
+
+  for (const r of answered) {
+    const course = r.competingCourse!.trim();
+    counts.set(course, (counts.get(course) ?? 0) + 1);
+  }
+
+  return [...counts.entries()]
+    .map(([courseName, count]) => ({
+      courseName,
+      count,
+      respondentPercentage: calculatePercentage(count, answered.length),
+    }))
+    .sort((a, b) => b.count - a.count);
 }
 
 export function buildCohortComparisons(
@@ -147,8 +208,20 @@ export function parseInsightResponse(response: { output_text?: string | null }) 
   }
 
   try {
-    return InsightResponseSchema.parse(JSON.parse(response.output_text));
+    const parsed: unknown = JSON.parse(response.output_text);
+    const direct = InsightResponseSchema.safeParse(parsed);
+    if (direct.success) return direct.data;
+
+    // some models wrap the result in a responseShape key
+    const wrapped = InsightResponseSchema.safeParse(
+      (parsed as Record<string, unknown>).responseShape,
+    );
+    if (wrapped.success) return wrapped.data;
+
+    console.error("Invalid insight JSON output:", parsed);
+    throw new ApiError("AI 인사이트 결과 형식이 올바르지 않습니다.", 502);
   } catch (error) {
+    if (error instanceof ApiError) throw error;
     console.error("Invalid insight JSON output:", error);
     throw new ApiError("AI 인사이트 결과 형식이 올바르지 않습니다.", 502);
   }
@@ -157,16 +230,22 @@ export function parseInsightResponse(response: { output_text?: string | null }) 
 export function buildStoredInsightSummary({
   insight,
   topPrimaryCauses,
+  topSecondaryActions,
+  competingCourses,
   cohortComparison,
 }: {
   insight: GeneratedInsight;
   topPrimaryCauses: PrimaryCauseShare[];
+  topSecondaryActions: SecondaryActionShare[];
+  competingCourses: CompetingCourseShare[];
   cohortComparison: CohortComparison;
 }) {
   return JSON.stringify({
     summary: insight.summary,
     recommendedActions: insight.recommendedActions,
     topPrimaryCauses,
+    topSecondaryActions,
+    competingCourses,
     cohortComparison,
   });
 }

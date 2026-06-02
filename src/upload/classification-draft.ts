@@ -19,10 +19,6 @@ export function buildClassificationDraft({
   selectedResultValues: string[];
   snapshot: WorkbookSnapshot;
 }): ClassificationDraft {
-  if (snapshot.totalRows > MAX_CLASSIFICATION_ROWS) {
-    throw new Error(CLASSIFICATION_LIMIT_ERROR_MESSAGE);
-  }
-
   const interviewColumn = findExactColumnName(snapshot.columns, "인터뷰내용");
   const notesColumn = findExactColumnName(snapshot.columns, "특이사항");
   const resultColumn = findExactColumnName(snapshot.columns, "최종결과");
@@ -49,6 +45,10 @@ export function buildClassificationDraft({
       },
     ];
   });
+
+  if (rows.length > MAX_CLASSIFICATION_ROWS) {
+    throw new Error(CLASSIFICATION_LIMIT_ERROR_MESSAGE);
+  }
 
   return {
     sessionId,

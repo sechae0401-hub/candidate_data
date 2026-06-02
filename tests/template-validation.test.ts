@@ -15,7 +15,7 @@ test("returns a missing-column result when a required column is absent", () => {
 
   assert.equal(result.status, "missing-column");
   assert.equal(result.missingColumn, "인터뷰내용");
-  assert.equal(result.message, "필수 컬럼 '인터뷰내용'이 없습니다. 분析용 양식을 먼저 다운로드해 사용해 주세요");
+  assert.equal(result.message, "'인터뷰내용' 컬럼이 없습니다. 파일에 '인터뷰내용', '특이사항', '최종결과' 컬럼이 있어야 합니다");
 });
 
 test("suggests a similar column when the uploaded file uses a nearby label", () => {

@@ -7,6 +7,8 @@ import {
   buildInsightPrompt,
   buildStoredInsightSummary,
   calculateTopPrimaryCauseShares,
+  calculateTopSecondaryActionShares,
+  calculateCompetingCourseShares,
   parseInsightResponse,
 } from "../src/classify/insight-summary";
 
@@ -95,6 +97,8 @@ test("buildStoredInsightSummary serializes generated insight and comparison", ()
       recommendedActions: ["내일배움카드 이슈(50%)가 높습니다. 안내를 강화하세요."],
     },
     topPrimaryCauses: calculateTopPrimaryCauseShares(currentResults),
+    topSecondaryActions: [],
+    competingCourses: [],
     cohortComparison: {
       notice: FIRST_COHORT_COMPARISON_NOTICE,
       comparisons: [],
@@ -105,9 +109,65 @@ test("buildStoredInsightSummary serializes generated insight and comparison", ()
     summary: "요약",
     recommendedActions: ["내일배움카드 이슈(50%)가 높습니다. 안내를 강화하세요."],
     topPrimaryCauses: calculateTopPrimaryCauseShares(currentResults),
+    topSecondaryActions: [],
+    competingCourses: [],
     cohortComparison: {
       notice: FIRST_COHORT_COMPARISON_NOTICE,
       comparisons: [],
     },
   });
+});
+
+test("calculateTopSecondaryActionShares counts non-null actions and returns top 5", () => {
+  const results = [
+    { secondaryAction: "카드 발급 안내" },
+    { secondaryAction: "카드 발급 안내" },
+    { secondaryAction: "일정 조율 지원" },
+    { secondaryAction: null },
+    { secondaryAction: "  " },
+  ];
+
+  const shares = calculateTopSecondaryActionShares(results);
+
+  assert.equal(shares.length, 2);
+  assert.equal(shares[0]?.secondaryAction, "카드 발급 안내");
+  assert.equal(shares[0]?.count, 2);
+  assert.equal(shares[0]?.percentage, 40);
+  assert.equal(shares[1]?.secondaryAction, "일정 조율 지원");
+  assert.equal(shares[1]?.count, 1);
+});
+
+test("calculateTopSecondaryActionShares returns empty array when all actions are null", () => {
+  const shares = calculateTopSecondaryActionShares([
+    { secondaryAction: null },
+    { secondaryAction: "" },
+  ]);
+
+  assert.deepEqual(shares, []);
+});
+
+test("calculateCompetingCourseShares counts courses relative to respondents only", () => {
+  const results = [
+    { competingCourse: "자바 입문" },
+    { competingCourse: "자바 입문" },
+    { competingCourse: "파이썬 기초" },
+    { competingCourse: null },
+    { competingCourse: "  " },
+  ];
+
+  const shares = calculateCompetingCourseShares(results);
+
+  assert.equal(shares.length, 2);
+  assert.equal(shares[0]?.courseName, "자바 입문");
+  assert.equal(shares[0]?.count, 2);
+  assert.equal(shares[0]?.respondentPercentage, 67);
+});
+
+test("calculateCompetingCourseShares returns empty array when no respondents", () => {
+  const shares = calculateCompetingCourseShares([
+    { competingCourse: null },
+    { competingCourse: "" },
+  ]);
+
+  assert.deepEqual(shares, []);
 });

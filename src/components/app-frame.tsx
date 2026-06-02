@@ -47,6 +47,9 @@ export function AppFrame({ children }: Readonly<{ children: React.ReactNode }>) 
         </div>
       </header>
       {children}
+      <footer className="px-6 pb-4 pt-2 text-right">
+        <p className="text-caption text-slate opacity-50">© 2026 채승은</p>
+      </footer>
     </div>
   );
 }

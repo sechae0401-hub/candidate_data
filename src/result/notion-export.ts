@@ -25,6 +25,24 @@ const StoredInsightSummarySchema = z.object({
       }),
     )
     .default([]),
+  topSecondaryActions: z
+    .array(
+      z.object({
+        secondaryAction: z.string(),
+        count: z.number(),
+        percentage: z.number(),
+      }),
+    )
+    .default([]),
+  competingCourses: z
+    .array(
+      z.object({
+        courseName: z.string(),
+        count: z.number(),
+        respondentPercentage: z.number(),
+      }),
+    )
+    .default([]),
   cohortComparison: z
     .object({
       notice: z.string().nullable(),
@@ -47,6 +65,8 @@ export const FALLBACK_INSIGHT_SUMMARY: StoredInsightSummary = {
   summary: "인사이트 요약을 불러오지 못했습니다.",
   recommendedActions: [],
   topPrimaryCauses: [],
+  topSecondaryActions: [],
+  competingCourses: [],
   cohortComparison: {
     notice: "이전 기수 비교 데이터가 없습니다.",
     comparisons: [],
