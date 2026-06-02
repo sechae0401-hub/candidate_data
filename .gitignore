@@ -30,3 +30,7 @@ Thumbs.db
 .playwright-mcp/
 playwright-report/
 test-results/
+
+# 보관용 바이너리 (디스크에는 유지, git 추적 제외)
+_archive/screenshots/
+_archive/sample-data/
