@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { cn } from "@/lib/utils";
 import type { ColumnAnalysisItem } from "@/upload/column-analysis";
 import { buildClassificationDraft, CLASSIFICATION_DRAFT_STORAGE_KEY } from "@/upload/classification-draft";
-import { formatWorkbookSummary, getWorkbookFileError } from "@/upload/file-acceptance";
+import { formatWorkbookSummary, getWorkbookFileError, MAX_UPLOAD_ROWS, WORKBOOK_ROW_LIMIT_ERROR_MESSAGE } from "@/upload/file-acceptance";
 import { parseWorkbookFile } from "@/upload/parse-workbook";
 import { countRowsForSelectedResultValues, getResultValueOptions } from "@/upload/result-selection";
 import { SESSION_ID_STORAGE_KEY } from "@/shared/session/session-guard";
@@ -100,6 +100,18 @@ export function UploadWorkspace() {
 
     try {
       const nextSnapshot = await parseWorkbookFile(file);
+
+      if (nextSnapshot.totalRows > MAX_UPLOAD_ROWS) {
+        setErrorMessage(WORKBOOK_ROW_LIMIT_ERROR_MESSAGE);
+        toast({
+          title: "파일 행 수를 확인해 주세요",
+          description: WORKBOOK_ROW_LIMIT_ERROR_MESSAGE,
+          variant: "error",
+        });
+        setIsParsing(false);
+        return;
+      }
+
       const nextValidationResult = validateTemplateColumns(nextSnapshot.columns);
 
       startTransition(() => {
@@ -257,6 +269,7 @@ export function UploadWorkspace() {
       <div className="mx-auto flex max-w-5xl flex-col gap-6">
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.9fr)]">
           <Card className="rounded-[28px]">
+
             <CardHeader>
               <Badge className="w-fit">업로드 시작</Badge>
               <CardTitle className="text-heading-page text-ink">파일을 올리면 취소 사유를 자동으로 분류합니다</CardTitle>
@@ -459,6 +472,59 @@ export function UploadWorkspace() {
             </CardContent>
           </Card>
 
+          {!snapshot ? (
+            /* 파일 미선택 시: 온보딩 3단계 가이드 */
+            <aside className="flex flex-col gap-4">
+              <div className="rounded-[28px] border border-hairline bg-white p-6">
+                <p className="mb-5 text-heading-sub text-ink">처음이신가요?</p>
+                <ol className="flex flex-col gap-5">
+                  <li className="flex gap-4">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ink text-sm font-semibold text-white">
+                      1
+                    </span>
+                    <div>
+                      <p className="text-button text-ink">양식 다운로드</p>
+                      <p className="mt-0.5 text-caption text-slate">
+                        노션 CRM 데이터가 있으면 건너뛰어도 됩니다.
+                      </p>
+                      <a
+                        download
+                        href={TEMPLATE_DOWNLOAD_PATH}
+                        className="mt-2 inline-flex items-center gap-1.5 text-caption text-ink underline underline-offset-2"
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        cancellation-template.xlsx
+                      </a>
+                    </div>
+                  </li>
+                  <li className="flex gap-4">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ink text-sm font-semibold text-white">
+                      2
+                    </span>
+                    <div>
+                      <p className="text-button text-ink">취소자 데이터 입력</p>
+                      <p className="mt-0.5 text-caption text-slate">
+                        <strong>인터뷰내용</strong>·<strong>특이사항</strong>·<strong>최종결과</strong>{" "}
+                        컬럼이 필수입니다. 노션 CRM에서 내보낸 파일은 바로 사용 가능합니다.
+                      </p>
+                    </div>
+                  </li>
+                  <li className="flex gap-4">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ink text-sm font-semibold text-white">
+                      3
+                    </span>
+                    <div>
+                      <p className="text-button text-ink">파일 업로드</p>
+                      <p className="mt-0.5 text-caption text-slate">
+                        xlsx 또는 xls 파일을 왼쪽 영역에 끌어다 놓거나 클릭해서 선택하세요.
+                        최대 {MAX_UPLOAD_ROWS}건까지 한 번에 분석됩니다.
+                      </p>
+                    </div>
+                  </li>
+                </ol>
+              </div>
+            </aside>
+          ) : (
           <Card className="rounded-[28px]">
             <CardHeader>
               <CardTitle>취소 대상 선택 및 분류 실행</CardTitle>
@@ -573,6 +639,7 @@ export function UploadWorkspace() {
               )}
             </CardContent>
           </Card>
+          )}
         </div>
 
         <section className="flex flex-col gap-3 rounded-[28px] border border-hairline bg-white p-6 sm:flex-row sm:items-center sm:justify-between">

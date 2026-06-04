@@ -1,7 +1,10 @@
 {
   "functions": {
     "src/app/api/classify/route.ts": {
-      "maxDuration": 9
+      "maxDuration": 30
+    },
+    "src/app/api/insight/route.ts": {
+      "maxDuration": 30
     }
   },
   "crons": [
