@@ -1,7 +1,7 @@
 "use client";
 
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, Download, FileSpreadsheet, UploadCloud } from "lucide-react";
+import { Download, FileSpreadsheet, Info, UploadCloud } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { Checkbox } from "@/components/ui/checkbox";
@@ -276,10 +276,10 @@ export function UploadWorkspace() {
               <CardDescription>노션 CRM에서 기수별로 내보낸 파일을 바로 올려 주세요.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="rounded-2xl border-2 border-status-review bg-status-review-soft px-4 py-3">
+              <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3">
                 <div className="mb-1.5 flex items-center gap-1.5">
-                  <AlertTriangle className="h-4 w-4 shrink-0 text-status-review" />
-                  <p className="text-button text-status-review">업로드 전 반드시 확인하세요</p>
+                  <Info className="h-4 w-4 shrink-0 text-blue-500" />
+                  <p className="text-button text-blue-700">업로드 전 확인하세요</p>
                 </div>
                 <ul className="list-disc space-y-1 pl-6 text-caption text-charcoal">
                   <li><strong>기수별로 파일을 나누어 업로드해 주세요.</strong> 여러 기수가 섞이면 분류 결과가 뒤섞입니다.</li>
@@ -288,8 +288,8 @@ export function UploadWorkspace() {
               </div>
               <div
                 className={cn(
-                  "rounded-[28px] border border-dashed p-6 transition-colors",
-                  isDragging ? "border-ink bg-surface" : "border-hairline bg-white",
+                  "cursor-pointer rounded-[28px] border-2 border-dashed p-8 transition-colors",
+                  isDragging ? "border-ink bg-surface" : "border-hairline bg-white hover:border-slate-400 hover:bg-surface",
                 )}
                 onDragEnter={(event) => {
                   event.preventDefault();
@@ -320,8 +320,8 @@ export function UploadWorkspace() {
 
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div className="space-y-2">
-                    <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-surface text-ink">
-                      <UploadCloud className="h-5 w-5" />
+                    <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-surface text-slate">
+                      <UploadCloud className="h-8 w-8" />
                     </div>
                     <p className="text-heading-sub text-ink">xlsx 또는 xls 파일을 이곳에 놓아 주세요</p>
                     <p className="text-body text-slate">
@@ -642,17 +642,6 @@ export function UploadWorkspace() {
           )}
         </div>
 
-        <section className="flex flex-col gap-3 rounded-[28px] border border-hairline bg-white p-6 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-body text-slate">
-            처음이세요? 이 양식으로 노션 CRM 데이터를 준비하면 바로 쓸 수 있습니다.
-          </p>
-          <Button asChild type="button" variant="secondary">
-            <a download href={TEMPLATE_DOWNLOAD_PATH}>
-              <Download className="mr-2 h-4 w-4" />
-              양식 다운로드
-            </a>
-          </Button>
-        </section>
       </div>
     </main>
   );
