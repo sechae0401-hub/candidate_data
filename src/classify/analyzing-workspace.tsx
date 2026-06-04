@@ -11,8 +11,10 @@ import {
   getAnalyzingStageLabel,
   hasFullClassificationFailure,
   INSIGHT_LOADING_MESSAGE,
+  PARALLEL_BATCH_COUNT,
   WITTY_LOADING_MESSAGES,
   type AnalyzingStage,
+  type BatchRange,
 } from "@/classify/analyzing-progress";
 import {
   buildCompletionMessage,
@@ -87,56 +89,68 @@ export function AnalyzingWorkspace() {
 
       let nextCompletedRows = 0;
       let nextFailedRows = 0;
+      let totalReviewCount = 0;
 
-      for (const range of buildBatchRanges(currentDraft.rows.length)) {
+      // PARALLEL_BATCH_COUNT 개씩 묶어 동시에 처리 (순차 대비 ~3배 속도)
+      const allRanges = buildBatchRanges(currentDraft.rows.length);
+      const rangeGroups: BatchRange[][] = [];
+      for (let i = 0; i < allRanges.length; i += PARALLEL_BATCH_COUNT) {
+        rangeGroups.push(allRanges.slice(i, i + PARALLEL_BATCH_COUNT));
+      }
+
+      const waitingTimer = window.setTimeout(() => {
+        setIsWaitingOnGpt(true);
+      }, 7000);
+
+      for (const group of rangeGroups) {
         if (isCancelledRef.current) {
           break;
         }
 
-        const waitingTimer = window.setTimeout(() => {
-          setIsWaitingOnGpt(true);
-        }, 7000);
+        const results = await Promise.allSettled(
+          group.map(async (range) => {
+            const batchRows = currentDraft.rows.slice(range.startIndex, range.endIndex);
+            const response = await fetch("/api/classify", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ sessionId: currentDraft.sessionId, rows: batchRows }),
+            });
+            const payload = (await response.json()) as BatchClassificationResponse;
 
-        const batchRows = currentDraft.rows.slice(range.startIndex, range.endIndex);
+            if (!response.ok) {
+              throw new Error(payload.error ?? "분류 배치를 처리하지 못했습니다.");
+            }
 
-        try {
-          const response = await fetch("/api/classify", {
-            method: "POST",
-            headers: {
-              "content-type": "application/json",
-            },
-            body: JSON.stringify({
-              sessionId: currentDraft.sessionId,
-              rows: batchRows,
-            }),
-          });
-          const payload = (await response.json()) as BatchClassificationResponse;
+            return {
+              processedCount: payload.processedCount ?? batchRows.length,
+              reviewCount: payload.reviewCount ?? 0,
+            };
+          }),
+        );
 
-          if (!response.ok) {
-            throw new Error(payload.error ?? "분류 배치를 처리하지 못했습니다.");
+        for (const [index, result] of results.entries()) {
+          const range = group[index];
+          const batchLength = range.endIndex - range.startIndex;
+
+          if (result.status === "fulfilled") {
+            nextCompletedRows += result.value.processedCount;
+            nextFailedRows += result.value.reviewCount;
+            totalReviewCount += result.value.reviewCount;
+          } else {
+            console.error("Classification batch failed:", result.reason);
+            nextFailedRows += batchLength;
           }
+        }
 
-          const processedCount = payload.processedCount ?? batchRows.length;
-          const reviewCount = payload.reviewCount ?? 0;
-          nextCompletedRows += processedCount;
-          nextFailedRows += reviewCount;
-          setCompletedRows(nextCompletedRows);
-          setFailedRows(nextFailedRows);
-
-          if (reviewCount > 0) {
-            setReviewNotice(buildReviewNotice(reviewCount));
-          }
-        } catch (error) {
-          console.error("Classification batch failed:", error);
-
-          nextFailedRows += batchRows.length;
-          setFailedRows(nextFailedRows);
-          setReviewNotice(buildReviewNotice(batchRows.length));
-        } finally {
-          window.clearTimeout(waitingTimer);
-          setIsWaitingOnGpt(false);
+        setCompletedRows(nextCompletedRows);
+        setFailedRows(nextFailedRows);
+        if (totalReviewCount > 0) {
+          setReviewNotice(buildReviewNotice(totalReviewCount));
         }
       }
+
+      window.clearTimeout(waitingTimer);
+      setIsWaitingOnGpt(false);
 
       if (
         hasFullClassificationFailure({

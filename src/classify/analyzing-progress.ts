@@ -1,4 +1,5 @@
 export const CLASSIFICATION_BATCH_SIZE = 3;
+export const PARALLEL_BATCH_COUNT = 3;
 
 export const INSIGHT_LOADING_MESSAGE =
   "취소 이유들을 한데 모아 흐름을 읽는 중입니다. 잠깐만요... 🧩";

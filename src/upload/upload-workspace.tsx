@@ -410,7 +410,7 @@ export function UploadWorkspace() {
                         <div>
                           <p className="text-button text-ink">AI가 이렇게 이해했습니다</p>
                           <p className="mt-1 text-caption text-slate">AI가 각 컬럼의 역할을 이렇게 이해했습니다.</p>
-                          <p className="mt-0.5 text-caption text-slate">틀린 항목이 있다면 '다시 분석'을 눌러 주세요.</p>
+                          <p className="mt-0.5 text-caption text-slate">틀린 항목이 있다면 &apos;다시 분석&apos;을 눌러 주세요.</p>
                         </div>
                         <div className="overflow-hidden rounded-3xl border border-hairline">
                           <table className="min-w-full border-collapse">
