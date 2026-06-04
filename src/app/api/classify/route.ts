@@ -1,5 +1,5 @@
 import { ApiError, withApiHandler } from "@/lib/api-handler";
-import { runOpenAiJsonRequest } from "@/lib/gpt-client";
+import { runAiJsonRequest } from "@/lib/gpt-client";
 import { getSupabaseServerClient } from "@/shared/supabase/server";
 import {
   buildClassificationResultInsertPayloads,
@@ -18,7 +18,7 @@ export async function POST(request: Request) {
         throw new ApiError("분류 요청 형식이 올바르지 않습니다.", 400);
       }
 
-      const classification = await classifyRows(parsed.data, runOpenAiJsonRequest);
+      const classification = await classifyRows(parsed.data, runAiJsonRequest);
       const supabase = getSupabaseServerClient();
       const resultPayloads = buildClassificationResultInsertPayloads(
         parsed.data.sessionId,

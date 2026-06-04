@@ -2,6 +2,25 @@ import { z } from "zod";
 
 import { ApiError } from "@/lib/api-handler";
 
+const TARGET_ANALYSIS_COLUMNS = [
+  "이름",
+  "유입경로",
+  "인터뷰내용",
+  "최종결과",
+  "최종기수",
+  "특이사항",
+  "합격자등록",
+] as const;
+
+function normalizeColName(name: string) {
+  return name.replace(/\s+/g, "").trim().toLowerCase();
+}
+
+function filterColumnsForAnalysis(columns: string[]): string[] {
+  const targets = TARGET_ANALYSIS_COLUMNS.map(normalizeColName);
+  return columns.filter((col) => targets.includes(normalizeColName(col)));
+}
+
 const UploadRowRecordSchema = z.record(
   z.string().max(200),
   z.preprocess((val) => (typeof val === "string" ? val : String(val ?? "")), z.string()),
@@ -92,6 +111,14 @@ export async function analyzeWorkbookColumns(
     throw new ApiError("업로드 컬럼 분석 요청이 올바르지 않습니다.", 400);
   }
 
-  const response = await requestRunner(buildColumnAnalysisPrompt(normalizedRequest.data));
+  const filteredColumns = filterColumnsForAnalysis(normalizedRequest.data.columns);
+  const analysisColumns = filteredColumns.length > 0 ? filteredColumns : normalizedRequest.data.columns;
+  const filteredSampleRows = normalizedRequest.data.sampleRows.map((row) =>
+    Object.fromEntries(Object.entries(row).filter(([key]) => analysisColumns.includes(key))),
+  );
+
+  const response = await requestRunner(
+    buildColumnAnalysisPrompt({ columns: analysisColumns, sampleRows: filteredSampleRows }),
+  );
   return parseColumnAnalysisResponse(response);
 }

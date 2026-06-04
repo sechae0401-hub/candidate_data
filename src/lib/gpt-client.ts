@@ -2,8 +2,9 @@ import "server-only";
 
 import OpenAI from "openai";
 
+import { runGeminiJsonRequest } from "@/lib/gemini-client";
 import { runWithGptRetry, type GptRetryOptions } from "@/lib/gpt-retry";
-import { readOpenAiEnv } from "@/shared/env/server";
+import { readAiProvider, readOpenAiEnv } from "@/shared/env/server";
 
 let openAiClient: OpenAI | undefined;
 
@@ -23,12 +24,25 @@ export async function runOpenAiJsonRequest(
   const client = getOpenAiClient();
   const env = readOpenAiEnv();
 
-  return runWithGptRetry(
-    () =>
-      client.responses.create({
-        model: env.OPENAI_MODEL,
-        input,
-      }),
-    options,
-  );
+  return runWithGptRetry(async () => {
+    const response = await client.chat.completions.create({
+      model: env.OPENAI_MODEL,
+      messages: [{ role: "user", content: input }],
+      response_format: { type: "json_object" },
+    });
+    return { output_text: response.choices[0]?.message?.content ?? null };
+  }, options);
+}
+
+export async function runAiJsonRequest(
+  input: string,
+  options: GptRetryOptions = {},
+) {
+  const provider = readAiProvider();
+
+  if (provider === "gemini") {
+    return runGeminiJsonRequest(input, options);
+  }
+
+  return runOpenAiJsonRequest(input, options);
 }

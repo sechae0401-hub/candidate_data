@@ -1,5 +1,5 @@
 import { ApiError, withApiHandler } from "@/lib/api-handler";
-import { runOpenAiJsonRequest } from "@/lib/gpt-client";
+import { runAiJsonRequest } from "@/lib/gpt-client";
 import { AnalyzeColumnsRequestSchema, analyzeWorkbookColumns } from "@/upload/column-analysis";
 
 export async function POST(request: Request) {
@@ -22,7 +22,7 @@ export async function POST(request: Request) {
         throw new ApiError(`파일을 분석할 수 없습니다: ${userMessage}`, 400);
       }
 
-      const columnAnalyses = await analyzeWorkbookColumns(parsed.data, runOpenAiJsonRequest);
+      const columnAnalyses = await analyzeWorkbookColumns(parsed.data, runAiJsonRequest);
 
       return { columnAnalyses };
     },

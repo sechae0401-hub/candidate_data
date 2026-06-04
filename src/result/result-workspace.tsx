@@ -1,6 +1,6 @@
 "use client";
 
-import { Copy, RefreshCw, RotateCcw, X } from "lucide-react";
+import { AlertTriangle, Copy, RefreshCw, RotateCcw, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -87,6 +87,47 @@ function displayValue(value: string | null) {
   return value?.trim() || "-";
 }
 
+interface TagWithCount {
+  tag: string;
+  count: number;
+}
+
+function buildTagsByPrimaryCause(rows: ResultRowSummary[]): Map<string, TagWithCount[]> {
+  const countMap = new Map<string, Map<string, number>>();
+  const skipTags = new Set(["정보 부족", "API 오류", "검토 필요", "-"]);
+
+  for (const row of rows) {
+    const cause = row.primaryCause?.trim();
+    if (!cause) continue;
+
+    const tags = (row.detailTags ?? "")
+      .split(",")
+      .map((t) => t.trim())
+      .filter((t) => t.length > 0 && !skipTags.has(t));
+
+    if (tags.length === 0) continue;
+
+    if (!countMap.has(cause)) countMap.set(cause, new Map());
+    const tagCounts = countMap.get(cause)!;
+
+    for (const tag of tags) {
+      tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
+    }
+  }
+
+  const result = new Map<string, TagWithCount[]>();
+  for (const [cause, tagCounts] of countMap) {
+    result.set(
+      cause,
+      [...tagCounts.entries()]
+        .map(([tag, count]) => ({ tag, count }))
+        .sort((a, b) => b.count - a.count),
+    );
+  }
+
+  return result;
+}
+
 async function copyTextToClipboard(text: string) {
   if (navigator.clipboard?.writeText) {
     try {
@@ -143,6 +184,7 @@ export function ResultWorkspace() {
   const summary = useMemo(() => calculateResultSummary(rows), [rows]);
   const selectedRow = useMemo(() => rows.find((row) => row.id === selectedRowId) ?? null, [rows, selectedRowId]);
   const insight = useMemo(() => parseStoredInsightSummary(data?.session.insight_summary ?? null), [data?.session.insight_summary]);
+  const tagsByPrimaryCause = useMemo(() => buildTagsByPrimaryCause(rows), [rows]);
   const newCategoryItems = useMemo<NewCategoryDisplayItem[]>(
     () =>
       (data?.newCategories ?? []).map((category) => ({
@@ -340,10 +382,11 @@ export function ResultWorkspace() {
     <main className="px-4 py-8 sm:px-6">
       <div className="mx-auto flex max-w-5xl flex-col gap-6">
         <header className="flex flex-col gap-2">
-          <p className="text-heading-page text-ink">취소 사유 분류 결과</p>
+          <p className="text-heading-page text-ink">
+            {data.session.cohort_name ? `${data.session.cohort_name} 취소 분석이 완료됐습니다` : "취소 분석이 완료됐습니다"}
+          </p>
           <p className="text-caption text-slate">
-            {data.session.cohort_name ? `${data.session.cohort_name} · ` : ""}
-            분류 완료 데이터를 검토 필요 상태별로 확인합니다.
+            총 {summary.totalCount}건 분류 완료 · 검토 필요 {summary.reviewCount}건
           </p>
         </header>
 
@@ -353,12 +396,19 @@ export function ResultWorkspace() {
           <Badge variant="done">완료 {summary.completedCount}건</Badge>
         </section>
 
+        {summary.reviewCount === 0 ? (
+          <p className="rounded-lg border border-status-done bg-status-done-soft px-4 py-2 text-caption text-slate">
+            모든 항목이 자동으로 완료됐습니다. 바로 노션에 복사할 수 있어요.
+          </p>
+        ) : null}
+
         <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
           <div className="overflow-hidden rounded-xl border border-hairline bg-white">
           <div className="overflow-x-auto">
             <table className="min-w-[1040px] w-full border-collapse text-table">
               <thead className="bg-surface text-left text-badge text-slate">
                 <tr>
+                  <th className="sticky left-0 z-10 bg-surface px-4 py-3 font-medium">상태</th>
                   <th className="px-4 py-3 font-medium">행</th>
                   <th className="px-4 py-3 font-medium">인터뷰 내용</th>
                   <th className="px-4 py-3 font-medium">1차 원인</th>
@@ -366,7 +416,6 @@ export function ResultWorkspace() {
                   <th className="px-4 py-3 font-medium">세부 태그</th>
                   <th className="px-4 py-3 font-medium">타 과정명</th>
                   <th className="px-4 py-3 font-medium">판단 근거</th>
-                  <th className="px-4 py-3 font-medium">상태</th>
                 </tr>
               </thead>
               <tbody>
@@ -385,6 +434,24 @@ export function ResultWorkspace() {
                           : "border-l-status-done bg-status-done-soft",
                       )}
                     >
+                      <td
+                        className={cn(
+                          "sticky left-0 z-10 whitespace-nowrap px-4 py-3",
+                          state === "review" ? "bg-status-review-soft" : "bg-status-done-soft",
+                        )}
+                      >
+                        <button
+                          type="button"
+                          className="inline-flex min-h-11 items-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            const nextState = state === "review" ? "done" : "review";
+                            void saveRowPatch(row.id, buildReviewStatePatch(nextState));
+                          }}
+                        >
+                          <ResultStatusBadge row={row} />
+                        </button>
+                      </td>
                       <td className="whitespace-nowrap px-4 py-3 text-slate">{row.rowIndex}</td>
                       <td className="max-w-[220px] px-4 py-3">
                         <span className="block truncate">{buildInterviewSummary(row)}</span>
@@ -431,19 +498,6 @@ export function ResultWorkspace() {
                       <td className="max-w-[220px] px-4 py-3">
                         <span className="block truncate">{displayValue(row.reasoning)}</span>
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <button
-                          type="button"
-                          className="inline-flex min-h-11 items-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            const nextState = state === "review" ? "done" : "review";
-                            void saveRowPatch(row.id, buildReviewStatePatch(nextState));
-                          }}
-                        >
-                          <ResultStatusBadge row={row} />
-                        </button>
-                      </td>
                     </tr>
                   );
                 })}
@@ -456,48 +510,161 @@ export function ResultWorkspace() {
         </section>
 
         <section className="flex flex-col gap-4">
-          <div className="rounded-lg border border-hairline bg-surface p-5">
-            <div className="flex flex-col gap-1">
-              <p className="text-heading-sub text-ink">인사이트</p>
-              <p className="text-caption text-slate">AI가 생성한 참고용 요약입니다.</p>
+          <div className="flex flex-col gap-1">
+            <p className="text-heading-sub text-ink">인사이트</p>
+            <p className="text-caption text-slate">AI가 이번 기수의 패턴을 요약했습니다.</p>
+          </div>
+
+          {/* A: AI 요약 callout */}
+          <div className="rounded-xl border-l-4 border-l-blue-400 bg-blue-50 px-5 py-4">
+            <p className="text-body text-charcoal">{insight.summary}</p>
+          </div>
+
+          {/* B: 1차 원인 — 전체 너비 + 막대 차트 */}
+          <div className="rounded-xl border border-hairline bg-white p-5">
+            <p className="mb-4 text-heading-sub text-ink">1차 원인</p>
+            {insight.topPrimaryCauses.length > 0 ? (
+              <div className="flex flex-col gap-4">
+                {insight.topPrimaryCauses.map((item) => {
+                  const tags = tagsByPrimaryCause.get(item.primaryCause) ?? [];
+                  return (
+                  <div key={item.primaryCause}>
+                    <div className="mb-1.5 flex items-center justify-between">
+                      <span className="text-body text-ink">{item.primaryCause}</span>
+                      <span className="text-caption text-slate">{item.count}건 · {item.percentage}%</span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-gray-100">
+                      <div
+                        className="h-full rounded-full bg-blue-400"
+                        style={{ width: `${item.percentage}%` }}
+                      />
+                    </div>
+                    {tags.length > 0 ? (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {tags.map(({ tag, count }) =>
+                          count >= 2 ? (
+                            <span
+                              key={tag}
+                              className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-caption text-amber-800"
+                            >
+                              <AlertTriangle className="h-3 w-3 flex-shrink-0" />
+                              {tag}
+                            </span>
+                          ) : (
+                            <span
+                              key={tag}
+                              className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-caption text-gray-600"
+                            >
+                              {tag}
+                            </span>
+                          ),
+                        )}
+                      </div>
+                    ) : null}
+                  </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-body text-slate">데이터가 없습니다.</p>
+            )}
+          </div>
+
+          {/* E: 2차 행동 + 타 과정 — 보조 정보 */}
+          <div className={cn("grid gap-4", insight.competingCourses.length > 0 ? "lg:grid-cols-2" : "")}>
+            <div className="rounded-xl border border-hairline bg-white p-5">
+              <p className="mb-3 text-badge text-slate">2차 행동</p>
+              {insight.topSecondaryActions.length > 0 ? (
+                <div className="overflow-hidden rounded-xl border border-hairline">
+                  <table className="min-w-full border-collapse text-body">
+                    <thead className="bg-surface">
+                      <tr>
+                        <th className="px-4 py-2 text-left text-caption text-slate">행동</th>
+                        <th className="px-4 py-2 text-right text-caption text-slate">건수</th>
+                        <th className="px-4 py-2 text-right text-caption text-slate">비율</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {insight.topSecondaryActions.map((item) => (
+                        <tr key={item.secondaryAction} className="border-t border-hairline">
+                          <td className="px-4 py-2 text-ink">{item.secondaryAction}</td>
+                          <td className="px-4 py-2 text-right text-charcoal">{item.count}</td>
+                          <td className="px-4 py-2 text-right text-charcoal">{item.percentage}%</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-body text-slate">데이터가 없습니다.</p>
+              )}
             </div>
 
-            <div className="mt-5 grid gap-5 lg:grid-cols-3">
-              <section>
-                <p className="text-badge text-slate">인사이트 요약</p>
-                <p className="mt-2 text-body text-charcoal">{insight.summary}</p>
-              </section>
+            {insight.competingCourses.length > 0 ? (
+              <div className="rounded-xl border border-hairline bg-white p-5">
+                <p className="mb-1 text-badge text-slate">타 과정 선택 상세</p>
+                <p className="mb-3 text-caption text-slate">
+                  응답자 {insight.competingCourses.reduce((s, c) => s + c.count, 0)}명 기준
+                </p>
+                <div className="overflow-hidden rounded-xl border border-hairline">
+                  <table className="min-w-full border-collapse text-body">
+                    <thead className="bg-surface">
+                      <tr>
+                        <th className="px-4 py-2 text-left text-caption text-slate">과정명</th>
+                        <th className="px-4 py-2 text-right text-caption text-slate">응답 수</th>
+                        <th className="px-4 py-2 text-right text-caption text-slate">응답자 중 비율</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {insight.competingCourses.map((item) => (
+                        <tr key={item.courseName} className="border-t border-hairline">
+                          <td className="px-4 py-2 text-ink">{item.courseName}</td>
+                          <td className="px-4 py-2 text-right text-charcoal">{item.count}</td>
+                          <td className="px-4 py-2 text-right text-charcoal">{item.respondentPercentage}%</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : null}
+          </div>
 
-              <section>
-                <p className="text-badge text-slate">운영 추천 액션</p>
-                {insight.recommendedActions.length > 0 ? (
-                  <ol className="mt-2 list-decimal space-y-2 pl-5 text-body text-charcoal">
-                    {insight.recommendedActions.map((action) => (
-                      <li key={action}>{action}</li>
-                    ))}
-                  </ol>
-                ) : (
-                  <p className="mt-2 text-body text-slate">추천 액션이 없습니다.</p>
-                )}
-              </section>
+          {/* C: 운영 추천 액션 — 카드 스타일 */}
+          <div className="rounded-xl border border-hairline bg-white p-5">
+            <p className="mb-3 text-heading-sub text-ink">운영 추천 액션</p>
+            {insight.recommendedActions.length > 0 ? (
+              <div className="flex flex-col gap-2">
+                {insight.recommendedActions.map((action, index) => (
+                  <div key={action} className="flex gap-3 rounded-lg border border-hairline bg-surface px-4 py-3">
+                    <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-ink text-xs font-semibold text-white">
+                      {index + 1}
+                    </span>
+                    <p className="text-body text-charcoal">{action}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-body text-slate">추천 액션이 없습니다.</p>
+            )}
+          </div>
 
-              <section>
-                <p className="text-badge text-slate">이전 기수 비교</p>
-                {insight.cohortComparison.notice ? (
-                  <p className="mt-2 text-body text-charcoal">{insight.cohortComparison.notice}</p>
-                ) : (
-                  <ul className="mt-2 space-y-2 text-body text-charcoal">
-                    {insight.cohortComparison.comparisons.map((item) => (
-                      <li key={item.primaryCause}>
-                        {item.primaryCause} {item.currentPercentage}% → 이전 평균 {item.previousAveragePercentage}% (
-                        {item.deltaPercentagePoints > 0 ? "+" : ""}
-                        {item.deltaPercentagePoints}%p)
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </section>
-            </div>
+          {/* E: 이전 기수 비교 — 독립 카드 */}
+          <div className="rounded-xl border border-hairline bg-white p-5">
+            <p className="mb-3 text-badge text-slate">이전 기수 비교</p>
+            {insight.cohortComparison.notice ? (
+              <p className="text-body text-charcoal">{insight.cohortComparison.notice}</p>
+            ) : (
+              <ul className="space-y-2 text-body text-charcoal">
+                {insight.cohortComparison.comparisons.map((item) => (
+                  <li key={item.primaryCause}>
+                    {item.primaryCause} {item.currentPercentage}% → 이전 평균 {item.previousAveragePercentage}% (
+                    {item.deltaPercentagePoints > 0 ? "+" : ""}
+                    {item.deltaPercentagePoints}%p)
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           {newCategorySummary ? (
@@ -506,7 +673,7 @@ export function ResultWorkspace() {
             </p>
           ) : null}
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 rounded-lg border border-hairline bg-surface p-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-caption text-slate">
               {copyEnabled ? "검토가 완료되어 노션 형식으로 복사할 수 있습니다." : "검토 필요 행을 모두 완료하면 복사할 수 있습니다."}
             </p>

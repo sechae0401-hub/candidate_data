@@ -129,14 +129,14 @@ export function validateTemplateColumns(columns: WorkbookSnapshot["columns"]): T
         status: "similar-column",
         missingColumn: requiredColumn,
         similarColumn,
-        message: `'${requiredColumn}' 컬럼이 없습니다. '${similarColumn}' 컬럼이 비슷합니다. 양식을 수정하거나 다시 확인해 주세요`,
+        message: `'${requiredColumn}' 컬럼이 없습니다. '${similarColumn}' 컬럼이 가장 유사합니다. 컬럼명을 '${requiredColumn}'으로 수정한 뒤 다시 업로드해 주세요`,
       };
     }
 
     return {
       status: "missing-column",
       missingColumn: requiredColumn,
-      message: `필수 컬럼 '${requiredColumn}'이 없습니다. 분析용 양식을 먼저 다운로드해 사용해 주세요`,
+      message: `'${requiredColumn}' 컬럼이 없습니다. 파일에 '인터뷰내용', '특이사항', '최종결과' 컬럼이 있어야 합니다`,
     };
   }
 

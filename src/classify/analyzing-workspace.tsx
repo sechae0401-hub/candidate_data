@@ -10,6 +10,8 @@ import {
   calculateProgressPercent,
   getAnalyzingStageLabel,
   hasFullClassificationFailure,
+  INSIGHT_LOADING_MESSAGE,
+  WITTY_LOADING_MESSAGES,
   type AnalyzingStage,
 } from "@/classify/analyzing-progress";
 import {
@@ -64,6 +66,7 @@ export function AnalyzingWorkspace() {
   const [failedRows, setFailedRows] = useState(0);
   const [reviewNotice, setReviewNotice] = useState<string | null>(null);
   const [isWaitingOnGpt, setIsWaitingOnGpt] = useState(false);
+  const [wittyMessageIndex, setWittyMessageIndex] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
   const [isRedirectingToResult, setIsRedirectingToResult] = useState(false);
@@ -265,6 +268,20 @@ export function AnalyzingWorkspace() {
     };
   }, [stage]);
 
+  useEffect(() => {
+    if (stage !== "classifying") {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      setWittyMessageIndex((prev) => (prev + 1) % WITTY_LOADING_MESSAGES.length);
+    }, 3500);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [stage]);
+
   return (
     <main className="px-6 py-12">
       <div
@@ -279,7 +296,15 @@ export function AnalyzingWorkspace() {
         </div>
 
         <div className="space-y-3">
-          <h1 className="text-heading-page text-ink">{getAnalyzingStageLabel(stage)}</h1>
+          <h1 className="text-heading-page text-ink">
+            {stage === "classifying"
+              ? WITTY_LOADING_MESSAGES[wittyMessageIndex]
+              : stage === "insight"
+              ? INSIGHT_LOADING_MESSAGE
+              : stage === "complete"
+              ? `${draft?.cohortName ? `${draft.cohortName} ` : ""}취소 사유 ${totalRows}건, 모두 분류됐습니다.`
+              : getAnalyzingStageLabel(stage)}
+          </h1>
           <p className="text-body text-slate">
             {completedRows}건 완료 / {totalRows}건 전체
           </p>

@@ -3,14 +3,31 @@ export interface OpenAiServerEnv {
   OPENAI_MODEL: string;
 }
 
+export interface GeminiServerEnv {
+  GEMINI_API_KEY: string;
+  GEMINI_MODEL: string;
+}
+
 export interface SupabaseServerEnv {
   SUPABASE_SERVICE_ROLE_KEY: string;
   SUPABASE_URL: string;
 }
 
+export type AiProvider = "openai" | "gemini";
+
 type EnvSource = Record<string, string | undefined>;
 
 function requireEnv(name: keyof (OpenAiServerEnv & SupabaseServerEnv), env: EnvSource) {
+  const value = env[name];
+
+  if (!value) {
+    throw new Error(`Missing required server environment variable: ${name}`);
+  }
+
+  return value;
+}
+
+function requireString(name: string, env: EnvSource) {
   const value = env[name];
 
   if (!value) {
@@ -39,4 +56,15 @@ export function readServerEnv(env: EnvSource = process.env): OpenAiServerEnv & S
     ...readOpenAiEnv(env),
     ...readSupabaseEnv(env),
   };
+}
+
+export function readGeminiEnv(env: EnvSource = process.env): GeminiServerEnv {
+  return {
+    GEMINI_API_KEY: requireString("GEMINI_API_KEY", env),
+    GEMINI_MODEL: env["GEMINI_MODEL"] ?? "gemini-2.0-flash",
+  };
+}
+
+export function readAiProvider(env: EnvSource = process.env): AiProvider {
+  return env["AI_PROVIDER"] === "gemini" ? "gemini" : "openai";
 }

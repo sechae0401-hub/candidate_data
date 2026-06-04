@@ -1,7 +1,7 @@
 "use client";
 
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
-import { Download, FileSpreadsheet, UploadCloud } from "lucide-react";
+import { AlertTriangle, Download, FileSpreadsheet, UploadCloud } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { Checkbox } from "@/components/ui/checkbox";
@@ -255,43 +255,24 @@ export function UploadWorkspace() {
   return (
     <main className="px-6 py-10">
       <div className="mx-auto flex max-w-5xl flex-col gap-6">
-        <section className="flex flex-col gap-4 rounded-[28px] border border-hairline bg-white p-6 shadow-sm lg:flex-row lg:items-center lg:justify-between">
-          <div className="space-y-2">
-            <Badge>업로드 시작</Badge>
-            <h1 className="text-heading-page text-ink">분석용 양식을 내려받고 파일을 업로드해 주세요</h1>
-            <p className="max-w-2xl text-body text-slate">
-              채매니저가 가장 먼저 거치는 화면입니다. 양식을 다운로드한 뒤 데이터를 채우고, 같은 화면에서 바로 업로드를 이어갈 수 있도록 구성합니다.
-            </p>
-          </div>
-          <Button asChild type="button">
-            <a download href={TEMPLATE_DOWNLOAD_PATH}>
-              <Download className="mr-2 h-4 w-4" />
-              분석용 엑셀 양식 다운로드
-            </a>
-          </Button>
-        </section>
-
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.9fr)]">
           <Card className="rounded-[28px]">
             <CardHeader>
-              <CardTitle>처음이라면 이 순서로 시작해 주세요</CardTitle>
-              <CardDescription>①양식 다운로드 → ②데이터 입력 → ③파일 업로드</CardDescription>
+              <Badge className="w-fit">업로드 시작</Badge>
+              <CardTitle className="text-heading-page text-ink">파일을 올리면 취소 사유를 자동으로 분류합니다</CardTitle>
+              <CardDescription>노션 CRM에서 기수별로 내보낸 파일을 바로 올려 주세요.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid gap-3 md:grid-cols-3">
-                {[
-                  ["01", "양식 다운로드", "고정 양식을 내려받아 필요한 컬럼을 그대로 유지합니다."],
-                  ["02", "데이터 입력", "취소자 데이터를 양식에 맞춰 정리하고 저장합니다."],
-                  ["03", "파일 업로드", "드래그앤드롭 또는 파일 선택으로 업로드를 시작합니다."],
-                ].map(([step, title, description]) => (
-                  <div key={step} className="rounded-3xl border border-hairline bg-surface p-4">
-                    <p className="text-badge text-slate">{step}</p>
-                    <p className="mt-3 text-heading-sub text-ink">{title}</p>
-                    <p className="mt-2 text-caption text-slate">{description}</p>
-                  </div>
-                ))}
+              <div className="rounded-2xl border-2 border-status-review bg-status-review-soft px-4 py-3">
+                <div className="mb-1.5 flex items-center gap-1.5">
+                  <AlertTriangle className="h-4 w-4 shrink-0 text-status-review" />
+                  <p className="text-button text-status-review">업로드 전 반드시 확인하세요</p>
+                </div>
+                <ul className="list-disc space-y-1 pl-6 text-caption text-charcoal">
+                  <li><strong>기수별로 파일을 나누어 업로드해 주세요.</strong> 여러 기수가 섞이면 분류 결과가 뒤섞입니다.</li>
+                  <li>한 번에 최대 200건까지 분석 가능합니다. 초과 시 기수를 나눠 업로드해 주세요.</li>
+                </ul>
               </div>
-
               <div
                 className={cn(
                   "rounded-[28px] border border-dashed p-6 transition-colors",
@@ -360,7 +341,7 @@ export function UploadWorkspace() {
                     </div>
                   ) : (
                     <div className="rounded-3xl border border-hairline bg-surface p-4 text-caption text-slate">
-                      아직 업로드된 파일이 없습니다. 양식을 다운로드하고 데이터를 입력한 뒤 업로드해 주세요.
+                      노션 CRM에서 내보낸 엑셀 파일이나 참고용 양식 작성 파일을 업로드해 주세요.
                     </div>
                   )}
 
@@ -377,7 +358,7 @@ export function UploadWorkspace() {
                       <p className="mt-1 text-caption text-slate">
                         {validationResult.status === "valid"
                           ? "필수 컬럼 확인이 끝났습니다. 다음 Story에서 AI 컬럼 분석이 이 상태를 이어받습니다."
-                          : "양식 다운로드 버튼으로 다시 양식을 받아 컬럼명을 맞춘 뒤 재업로드해 주세요."}
+                          : "파일에 '인터뷰내용', '특이사항', '최종결과' 컬럼이 있어야 합니다. 참고용 양식을 확인하세요."}
                       </p>
                     </div>
                   ) : null}
@@ -386,7 +367,7 @@ export function UploadWorkspace() {
                     <div className="rounded-3xl border border-hairline bg-white p-4">
                       <p className="text-button text-ink">AI가 파일을 분석하고 있습니다...</p>
                       <p className="mt-1 text-caption text-slate">
-                        검증을 통과한 컬럼 구조를 GPT-5.5가 읽고 있습니다. 잠시만 기다려 주세요.
+                        플데의 취소자 전문 탐정이 컬럼 구조를 파악하고 있습니다. 잠시만 기다려 주세요.
                       </p>
                     </div>
                   ) : null}
@@ -415,9 +396,8 @@ export function UploadWorkspace() {
                       <div className="space-y-4">
                         <div>
                           <p className="text-button text-ink">AI가 이렇게 이해했습니다</p>
-                          <p className="mt-1 text-caption text-slate">
-                            컬럼 이해가 맞는지 확인한 뒤 승인해야 다음 단계가 열립니다.
-                          </p>
+                          <p className="mt-1 text-caption text-slate">AI가 각 컬럼의 역할을 이렇게 이해했습니다.</p>
+                          <p className="mt-0.5 text-caption text-slate">틀린 항목이 있다면 '다시 분석'을 눌러 주세요.</p>
                         </div>
                         <div className="overflow-hidden rounded-3xl border border-hairline">
                           <table className="min-w-full border-collapse">
@@ -528,7 +508,8 @@ export function UploadWorkspace() {
                     </div>
 
                     <div className="rounded-2xl border border-hairline bg-surface p-4">
-                      <p className="text-button text-ink">분류 대상 {selectedRowCount}건</p>
+                      <p className="text-caption text-slate">분류 대상</p>
+                      <p className="text-heading-page text-ink leading-tight">{selectedRowCount}건</p>
                       <p className="mt-1 text-caption text-slate">
                         취소 관련 항목을 하나 이상 선택해 주세요.
                       </p>
@@ -550,16 +531,21 @@ export function UploadWorkspace() {
                       />
                     </div>
 
-                    <div className="flex flex-wrap gap-3">
-                      <Button
-                        disabled={selectedRowCount === 0 || isCreatingSession}
-                        type="button"
-                        onClick={() => {
-                          void handleCreateSession();
-                        }}
-                      >
-                        {isCreatingSession ? "분류 준비 중..." : "분류 실행"}
-                      </Button>
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap gap-3">
+                        <Button
+                          disabled={selectedRowCount === 0 || isCreatingSession}
+                          type="button"
+                          onClick={() => {
+                            void handleCreateSession();
+                          }}
+                        >
+                          {isCreatingSession ? "분류 준비 중..." : "분류 실행"}
+                        </Button>
+                      </div>
+                      {selectedRowCount > 0 ? (
+                        <p className="text-caption text-slate">3건씩 처리 · 건수에 따라 소요 시간이 달라질 수 있습니다</p>
+                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -568,8 +554,8 @@ export function UploadWorkspace() {
                   <p className="text-button text-ink">분류 실행 상태</p>
                   <p className="mt-1 text-caption text-slate">
                     {validationResult?.status === "valid"
-                      ? "양식 검증까지 완료되었습니다. AI 컬럼 분석을 승인하면 취소 대상 선택 카드가 열립니다."
-                      : "양식 검증을 통과하기 전에는 분류 실행 버튼이 비활성화됩니다."}
+                      ? "필수 컬럼 확인이 완료되었습니다. AI 컬럼 분석을 승인하면 취소 대상 선택이 가능합니다."
+                      : "파일에 필수 컬럼(인터뷰내용, 특이사항, 최종결과)이 확인되면 분류 실행이 활성화됩니다."}
                   </p>
                   <div className="mt-4 flex flex-wrap gap-3">
                     <Button disabled type="button">
@@ -578,7 +564,7 @@ export function UploadWorkspace() {
                     {validationResult?.status !== "valid" ? (
                       <Button asChild type="button" variant="secondary">
                         <a download href={TEMPLATE_DOWNLOAD_PATH}>
-                          양식 다시 다운로드
+                          양식 다운로드
                         </a>
                       </Button>
                     ) : null}
@@ -588,6 +574,18 @@ export function UploadWorkspace() {
             </CardContent>
           </Card>
         </div>
+
+        <section className="flex flex-col gap-3 rounded-[28px] border border-hairline bg-white p-6 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-body text-slate">
+            처음이세요? 이 양식으로 노션 CRM 데이터를 준비하면 바로 쓸 수 있습니다.
+          </p>
+          <Button asChild type="button" variant="secondary">
+            <a download href={TEMPLATE_DOWNLOAD_PATH}>
+              <Download className="mr-2 h-4 w-4" />
+              양식 다운로드
+            </a>
+          </Button>
+        </section>
       </div>
     </main>
   );

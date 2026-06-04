@@ -1,5 +1,17 @@
 export const CLASSIFICATION_BATCH_SIZE = 3;
 
+export const INSIGHT_LOADING_MESSAGE =
+  "취소 이유들을 한데 모아 흐름을 읽는 중입니다. 잠깐만요... 🧩";
+
+export const WITTY_LOADING_MESSAGES = [
+  "플데 AI 탐정 출동! 취소 사유를 추적 중입니다 🕵️ 진실은 반드시 밝혀집니다",
+  "지원자의 마음속을 낱낱이 파헤치는 중... 모두 밝혀질 것입니다 🔍",
+  "왜 떠났을까요... 플데 AI가 눈물을 닦으며 이유를 찾는 중입니다 💔",
+  "지원자의 마음 변심 원인을 추적 중입니다. 연락두절의 이유를 찾겠습니다",
+  "야근은 없다! 3건씩 처리 중이니 잠깐만요 🖥️ - 플데 마케터 어록",
+  "분석봇이 세 명씩 묶어 심문하고 있습니다. 잠시만 기다려 주세요",
+] as const;
+
 export type AnalyzingStage = "classifying" | "insight" | "complete" | "failed";
 
 export interface BatchRange {

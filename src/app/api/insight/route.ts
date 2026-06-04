@@ -1,13 +1,15 @@
 import { z } from "zod";
 
 import { ApiError, withApiHandler } from "@/lib/api-handler";
-import { runOpenAiJsonRequest } from "@/lib/gpt-client";
+import { runAiJsonRequest } from "@/lib/gpt-client";
 import { getSupabaseServerClient } from "@/shared/supabase/server";
 import {
   buildCohortComparisons,
   buildInsightPrompt,
   buildStoredInsightSummary,
+  calculateCompetingCourseShares,
   calculateTopPrimaryCauseShares,
+  calculateTopSecondaryActionShares,
   parseInsightResponse,
   type PreviousCohortResults,
 } from "@/classify/insight-summary";
@@ -19,6 +21,8 @@ const InsightRequestSchema = z.object({
 interface ClassificationResultRecord {
   session_id: string;
   primary_cause: string | null;
+  secondary_action: string | null;
+  competing_course: string | null;
   needs_review: boolean;
 }
 
@@ -54,7 +58,7 @@ export async function POST(request: Request) {
       const supabase = getSupabaseServerClient();
       const { data: currentResultsData, error: currentResultsError } = await supabase
         .from("classification_results")
-        .select("session_id, primary_cause, needs_review")
+        .select("session_id, primary_cause, secondary_action, competing_course, needs_review")
         .eq("session_id", parsed.data.sessionId);
 
       if (currentResultsError) {
@@ -102,9 +106,15 @@ export async function POST(request: Request) {
           needsReview: result.needs_review,
         })),
       );
+      const topSecondaryActions = calculateTopSecondaryActionShares(
+        currentResults.map((result) => ({ secondaryAction: result.secondary_action })),
+      );
+      const competingCourses = calculateCompetingCourseShares(
+        currentResults.map((result) => ({ competingCourse: result.competing_course })),
+      );
       const cohortComparison = buildCohortComparisons(topPrimaryCauses, previousCohorts);
       const insight = parseInsightResponse(
-        await runOpenAiJsonRequest(
+        await runAiJsonRequest(
           buildInsightPrompt({
             topPrimaryCauses,
             cohortComparison,
@@ -114,6 +124,8 @@ export async function POST(request: Request) {
       const storedInsight = buildStoredInsightSummary({
         insight,
         topPrimaryCauses,
+        topSecondaryActions,
+        competingCourses,
         cohortComparison,
       });
 
@@ -135,6 +147,8 @@ export async function POST(request: Request) {
         summary: insight.summary,
         recommendedActions: insight.recommendedActions,
         topPrimaryCauses,
+        topSecondaryActions,
+        competingCourses,
         cohortComparison,
       };
     },
