@@ -11,6 +11,7 @@ import {
   buildHeadline,
   buildInflowBreakdown,
   buildStageBreakdown,
+  hasInflowData,
   type DashboardRow,
   type SegmentBreakdown,
 } from "@/result/dashboard-insights";
@@ -157,7 +158,9 @@ export function DashboardWorkspace() {
 
   const inflowSegments = useMemo(() => buildInflowBreakdown(dashboardRows), [dashboardRows]);
   const stageSegments = useMemo(() => buildStageBreakdown(dashboardRows), [dashboardRows]);
+  const inflowAvailable = useMemo(() => hasInflowData(dashboardRows), [dashboardRows]);
   const activeSegments = activeTab === "inflow" ? inflowSegments : stageSegments;
+  const inflowMissing = activeTab === "inflow" && !inflowAvailable;
   const headline = useMemo(() => buildHeadline(activeSegments), [activeSegments]);
 
   const counts = useMemo(() => {
@@ -296,9 +299,22 @@ export function DashboardWorkspace() {
           ))}
         </div>
 
-        <div className="rounded-xl border-l-4 border-l-blue-400 bg-blue-50 px-5 py-4">
-          <p className="text-body text-charcoal">💬 {headline}</p>
-        </div>
+        {inflowMissing ? (
+          <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-hairline bg-surface px-6 py-10 text-center">
+            <p className="text-heading-sub text-ink">유입경로 정보가 없어요</p>
+            <p className="max-w-md text-body text-slate">
+              이 파일에는 &lsquo;유입경로&rsquo; 칸이 없어 유입경로별 분석을 표시할 수 없어요. 유입경로
+              칸이 포함된 파일로 다시 분류하면 경로별 취소 사유를 비교할 수 있어요.
+            </p>
+            <Button type="button" variant="secondary" onClick={() => setActiveTab("stage")}>
+              단계별 탭 보기
+            </Button>
+          </div>
+        ) : (
+          <>
+            <div className="rounded-xl border-l-4 border-l-blue-400 bg-blue-50 px-5 py-4">
+              <p className="text-body text-charcoal">💬 {headline}</p>
+            </div>
 
         {activeSegments.length > 0 ? (
           <section className="flex flex-col gap-3">
@@ -358,6 +374,8 @@ export function DashboardWorkspace() {
           <p className="rounded-lg border border-hairline bg-surface px-4 py-6 text-center text-body text-slate">
             이 기준으로 나눌 데이터가 없습니다.
           </p>
+        )}
+          </>
         )}
       </div>
     </main>

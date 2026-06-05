@@ -50,6 +50,11 @@ export function readSourceField(
   return "";
 }
 
+// 업로드한 파일에 유입경로 값이 하나라도 있는지 (없으면 유입경로별 분석 불가)
+export function hasInflowData(rows: DashboardRow[]): boolean {
+  return rows.some((row) => readSourceField(row.source, INFLOW_COLUMN) !== "");
+}
+
 // ── 이탈 단계 매핑 (최종결과 → 단계) ──
 export type StageKey = "interview-before" | "in-progress" | "after-pass" | "other";
 

@@ -5,6 +5,7 @@ import {
   buildHeadline,
   buildInflowBreakdown,
   buildStageBreakdown,
+  hasInflowData,
   mapFinalResultToStage,
   readSourceField,
   type DashboardRow,
@@ -81,6 +82,20 @@ test("buildInflowBreakdown은 유입경로가 비면 미입력 세그먼트로 �
   assert.equal(result.length, 1);
   assert.equal(result[0].label, "미입력");
   assert.equal(result[0].total, 2);
+});
+
+test("hasInflowData는 유입경로 값이 하나도 없으면 false를 반환한다", () => {
+  const noInflow: DashboardRow[] = [
+    row("비용 부담", { 최종결과: "신청취소(본인요청)", 인터뷰내용: "x" }),
+    row("일정 충돌", { 최종결과: "신청취소(연락X)" }),
+  ];
+  assert.equal(hasInflowData(noInflow), false);
+
+  const withInflow: DashboardRow[] = [
+    row("비용 부담", { 유입경로: "SNS 광고" }),
+    row("일정 충돌", {}),
+  ];
+  assert.equal(hasInflowData(withInflow), true);
 });
 
 test("buildHeadline은 상위 두 세그먼트의 대표 사유를 비교 문장으로 만든다", () => {
