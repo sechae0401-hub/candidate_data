@@ -1,11 +1,12 @@
 "use client";
 
-import { ArrowLeft, RefreshCw } from "lucide-react";
+import { ArrowLeft, Lightbulb, Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import type { SegmentInsight } from "@/result/dashboard-insight-ai";
 import {
   buildHeadline,
   buildInflowBreakdown,
@@ -72,12 +73,53 @@ function SegmentCard({ segment }: { segment: SegmentBreakdown }) {
   );
 }
 
+function insightCacheKey(sessionId: string, tab: TabKey) {
+  return `dashboard_insight_${sessionId}_${tab}`;
+}
+
+function AiInsightCard({ insight }: { insight: SegmentInsight }) {
+  return (
+    <div className="rounded-xl border border-hairline bg-white p-5">
+      <div className="mb-3 flex items-center gap-2">
+        <span className="text-heading-sub text-ink">📍 {insight.segment}</span>
+        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-caption text-amber-800">AI 추정</span>
+      </div>
+      <dl className="flex flex-col gap-2.5">
+        <div>
+          <dt className="text-badge text-slate">관찰</dt>
+          <dd className="text-body text-charcoal">{insight.observation}</dd>
+        </div>
+        <div>
+          <dt className="text-badge text-slate">추정 원인</dt>
+          <dd className="text-body text-charcoal">{insight.hypothesis}</dd>
+        </div>
+        <div>
+          <dt className="flex items-center gap-1 text-badge text-blue-600">
+            <Lightbulb className="h-3.5 w-3.5" />
+            추천 액션
+          </dt>
+          <dd className="text-body font-medium text-ink">{insight.action}</dd>
+        </div>
+      </dl>
+    </div>
+  );
+}
+
 export function DashboardWorkspace() {
   const router = useRouter();
   const [data, setData] = useState<DashboardApiPayload | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabKey>("inflow");
+  const [aiInsights, setAiInsights] = useState<Record<TabKey, SegmentInsight[] | null>>({
+    inflow: null,
+    stage: null,
+  });
+  const [aiLoadingTab, setAiLoadingTab] = useState<TabKey | null>(null);
+  const [aiErrorTab, setAiErrorTab] = useState<Record<TabKey, string | null>>({
+    inflow: null,
+    stage: null,
+  });
 
   const loadResult = useCallback(async () => {
     const sessionId = window.localStorage.getItem(SESSION_ID_STORAGE_KEY);
@@ -124,6 +166,58 @@ export function DashboardWorkspace() {
     const reviewCount = rows.filter((row) => row.needs_review && !row.review_completed).length;
     return { totalCount: rows.length, reviewCount };
   }, [data?.results]);
+
+  // 새로고침해도 유지되도록 localStorage에 캐시된 인사이트를 복원
+  useEffect(() => {
+    const sessionId = window.localStorage.getItem(SESSION_ID_STORAGE_KEY);
+    if (!sessionId) return;
+
+    setAiInsights((current) => {
+      const next = { ...current };
+      for (const tab of ["inflow", "stage"] as TabKey[]) {
+        const cached = window.localStorage.getItem(insightCacheKey(sessionId, tab));
+        if (cached) {
+          try {
+            next[tab] = JSON.parse(cached) as SegmentInsight[];
+          } catch {
+            // 캐시가 깨졌으면 무시
+          }
+        }
+      }
+      return next;
+    });
+  }, []);
+
+  const fetchInsights = useCallback(async (tab: TabKey) => {
+    const sessionId = window.localStorage.getItem(SESSION_ID_STORAGE_KEY);
+    if (!sessionId) return;
+
+    setAiLoadingTab(tab);
+    setAiErrorTab((current) => ({ ...current, [tab]: null }));
+
+    try {
+      const response = await fetch("/api/dashboard-insight", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId, tab }),
+      });
+      const payload = (await response.json()) as { insights?: SegmentInsight[]; error?: string };
+
+      if (!response.ok || !payload.insights) {
+        throw new Error(payload.error ?? "AI 인사이트를 생성하지 못했습니다.");
+      }
+
+      setAiInsights((current) => ({ ...current, [tab]: payload.insights! }));
+      window.localStorage.setItem(insightCacheKey(sessionId, tab), JSON.stringify(payload.insights));
+    } catch (error) {
+      setAiErrorTab((current) => ({
+        ...current,
+        [tab]: error instanceof Error ? error.message : "AI 인사이트를 생성하지 못했습니다.",
+      }));
+    } finally {
+      setAiLoadingTab(null);
+    }
+  }, []);
 
   if (isLoading) {
     return (
@@ -206,6 +300,54 @@ export function DashboardWorkspace() {
         <div className="rounded-xl border-l-4 border-l-blue-400 bg-blue-50 px-5 py-4">
           <p className="text-body text-charcoal">💬 {headline}</p>
         </div>
+
+        {activeSegments.length > 0 ? (
+          <section className="flex flex-col gap-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-heading-sub text-ink">AI 인사이트</p>
+              {aiInsights[activeTab] ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="text-slate"
+                  disabled={aiLoadingTab === activeTab}
+                  onClick={() => void fetchInsights(activeTab)}
+                >
+                  <RefreshCw className="mr-1.5 h-4 w-4" />
+                  다시 생성
+                </Button>
+              ) : null}
+            </div>
+
+            {aiLoadingTab === activeTab ? (
+              <div className="flex items-center gap-2 rounded-xl border border-hairline bg-surface px-5 py-6 text-body text-slate">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                AI가 그룹별 원인과 액션을 분석하고 있어요...
+              </div>
+            ) : aiInsights[activeTab] ? (
+              <div className="grid gap-4 lg:grid-cols-2">
+                {aiInsights[activeTab]!.map((insight) => (
+                  <AiInsightCard key={insight.segment} insight={insight} />
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-start gap-2 rounded-xl border border-dashed border-hairline bg-surface px-5 py-6">
+                <p className="text-body text-slate">
+                  그룹별 <span className="text-ink">추정 원인</span>과{" "}
+                  <span className="text-ink">추천 액션</span>을 AI가 만들어 드려요. (몇 초 소요)
+                </p>
+                <Button type="button" onClick={() => void fetchInsights(activeTab)}>
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  AI 인사이트 받기
+                </Button>
+              </div>
+            )}
+
+            {aiErrorTab[activeTab] ? (
+              <p className="text-caption text-red-600">{aiErrorTab[activeTab]}</p>
+            ) : null}
+          </section>
+        ) : null}
 
         {activeSegments.length > 0 ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
