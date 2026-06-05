@@ -91,55 +91,33 @@ export function AnalyzingWorkspace() {
       let nextFailedRows = 0;
       let totalReviewCount = 0;
 
-      // PARALLEL_BATCH_COUNT 개씩 묶어 동시에 처리 (순차 대비 ~3배 속도)
+      // 동시성 풀: 항상 PARALLEL_BATCH_COUNT개를 처리 중으로 유지하고,
+      // 한 배치가 끝나면 대기 없이 다음 배치를 바로 투입한다 (묶음 단위 대기벽 제거).
       const allRanges = buildBatchRanges(currentDraft.rows.length);
-      const rangeGroups: BatchRange[][] = [];
-      for (let i = 0; i < allRanges.length; i += PARALLEL_BATCH_COUNT) {
-        rangeGroups.push(allRanges.slice(i, i + PARALLEL_BATCH_COUNT));
-      }
+      let cursor = 0;
 
-      const waitingTimer = window.setTimeout(() => {
-        setIsWaitingOnGpt(true);
-      }, 7000);
+      const processBatch = async (range: BatchRange) => {
+        const batchRows = currentDraft.rows.slice(range.startIndex, range.endIndex);
+        const batchLength = range.endIndex - range.startIndex;
 
-      for (const group of rangeGroups) {
-        if (isCancelledRef.current) {
-          break;
-        }
+        try {
+          const response = await fetch("/api/classify", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ sessionId: currentDraft.sessionId, rows: batchRows }),
+          });
+          const payload = (await response.json()) as BatchClassificationResponse;
 
-        const results = await Promise.allSettled(
-          group.map(async (range) => {
-            const batchRows = currentDraft.rows.slice(range.startIndex, range.endIndex);
-            const response = await fetch("/api/classify", {
-              method: "POST",
-              headers: { "content-type": "application/json" },
-              body: JSON.stringify({ sessionId: currentDraft.sessionId, rows: batchRows }),
-            });
-            const payload = (await response.json()) as BatchClassificationResponse;
-
-            if (!response.ok) {
-              throw new Error(payload.error ?? "분류 배치를 처리하지 못했습니다.");
-            }
-
-            return {
-              processedCount: payload.processedCount ?? batchRows.length,
-              reviewCount: payload.reviewCount ?? 0,
-            };
-          }),
-        );
-
-        for (const [index, result] of results.entries()) {
-          const range = group[index];
-          const batchLength = range.endIndex - range.startIndex;
-
-          if (result.status === "fulfilled") {
-            nextCompletedRows += result.value.processedCount;
-            nextFailedRows += result.value.reviewCount;
-            totalReviewCount += result.value.reviewCount;
-          } else {
-            console.error("Classification batch failed:", result.reason);
-            nextFailedRows += batchLength;
+          if (!response.ok) {
+            throw new Error(payload.error ?? "분류 배치를 처리하지 못했습니다.");
           }
+
+          nextCompletedRows += payload.processedCount ?? batchLength;
+          nextFailedRows += payload.reviewCount ?? 0;
+          totalReviewCount += payload.reviewCount ?? 0;
+        } catch (error) {
+          console.error("Classification batch failed:", error);
+          nextFailedRows += batchLength;
         }
 
         setCompletedRows(nextCompletedRows);
@@ -147,7 +125,25 @@ export function AnalyzingWorkspace() {
         if (totalReviewCount > 0) {
           setReviewNotice(buildReviewNotice(totalReviewCount));
         }
-      }
+      };
+
+      const worker = async () => {
+        while (!isCancelledRef.current) {
+          const index = cursor;
+          cursor += 1;
+          if (index >= allRanges.length) {
+            return;
+          }
+          await processBatch(allRanges[index]);
+        }
+      };
+
+      const waitingTimer = window.setTimeout(() => {
+        setIsWaitingOnGpt(true);
+      }, 7000);
+
+      const workerCount = Math.min(PARALLEL_BATCH_COUNT, allRanges.length);
+      await Promise.all(Array.from({ length: workerCount }, () => worker()));
 
       window.clearTimeout(waitingTimer);
       setIsWaitingOnGpt(false);
