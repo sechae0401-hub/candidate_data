@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Copy, RefreshCw, RotateCcw, X } from "lucide-react";
+import { AlertTriangle, BarChart3, Copy, RefreshCw, RotateCcw, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -381,13 +381,24 @@ export function ResultWorkspace() {
   return (
     <main className="px-4 py-8 sm:px-6">
       <div className="mx-auto flex max-w-5xl flex-col gap-6">
-        <header className="flex flex-col gap-2">
-          <p className="text-heading-page text-ink">
-            {data.session.cohort_name ? `${data.session.cohort_name} 취소 분석이 완료됐습니다` : "취소 분석이 완료됐습니다"}
-          </p>
-          <p className="text-caption text-slate">
-            총 {summary.totalCount}건 분류 완료 · 검토 필요 {summary.reviewCount}건
-          </p>
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex flex-col gap-2">
+            <p className="text-heading-page text-ink">
+              {data.session.cohort_name ? `${data.session.cohort_name} 취소 분석이 완료됐습니다` : "취소 분석이 완료됐습니다"}
+            </p>
+            <p className="text-caption text-slate">
+              총 {summary.totalCount}건 분류 완료 · 검토 필요 {summary.reviewCount}건
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="secondary"
+            className="w-fit"
+            onClick={() => router.push("/result/dashboard")}
+          >
+            <BarChart3 className="mr-2 h-4 w-4" />
+            인사이트 대시보드 보기
+          </Button>
         </header>
 
         <section className="flex flex-wrap items-center gap-3 border-y border-hairline bg-surface px-6 py-4">
