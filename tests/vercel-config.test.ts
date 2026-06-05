@@ -10,5 +10,6 @@ test("vercel cron pings the lightweight health route daily", async () => {
   };
 
   assert.deepEqual(config.crons, [{ path: "/api/ping", schedule: "0 0 * * *" }]);
-  assert.equal(config.functions["src/app/api/classify/route.ts"]?.maxDuration, 9);
+  assert.equal(config.functions["src/app/api/classify/route.ts"]?.maxDuration, 30);
+  assert.equal(config.functions["src/app/api/insight/route.ts"]?.maxDuration, 30);
 });

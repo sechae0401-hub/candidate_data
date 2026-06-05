@@ -404,106 +404,106 @@ export function ResultWorkspace() {
 
         <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
           <div className="overflow-hidden rounded-xl border border-hairline bg-white">
-          <div className="overflow-x-auto">
-            <table className="min-w-[1040px] w-full border-collapse text-table">
-              <thead className="bg-surface text-left text-badge text-slate">
-                <tr>
-                  <th className="sticky left-0 z-10 bg-surface px-4 py-3 font-medium">상태</th>
-                  <th className="px-4 py-3 font-medium">행</th>
-                  <th className="px-4 py-3 font-medium">인터뷰 내용</th>
-                  <th className="px-4 py-3 font-medium">1차 원인</th>
-                  <th className="px-4 py-3 font-medium">2차 행동</th>
-                  <th className="px-4 py-3 font-medium">세부 태그</th>
-                  <th className="px-4 py-3 font-medium">타 과정명</th>
-                  <th className="px-4 py-3 font-medium">판단 근거</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => {
-                  const state = getResultReviewState(row);
+            <div className="overflow-x-auto">
+              <table className="min-w-[1040px] w-full border-collapse text-table">
+                <thead className="bg-surface text-left text-badge text-slate">
+                  <tr>
+                    <th className="sticky left-0 z-10 bg-surface px-4 py-3 font-medium">상태</th>
+                    <th className="px-4 py-3 font-medium">행</th>
+                    <th className="px-4 py-3 font-medium">인터뷰 내용</th>
+                    <th className="px-4 py-3 font-medium">1차 원인</th>
+                    <th className="px-4 py-3 font-medium">2차 행동</th>
+                    <th className="px-4 py-3 font-medium">세부 태그</th>
+                    <th className="px-4 py-3 font-medium">타 과정명</th>
+                    <th className="px-4 py-3 font-medium">판단 근거</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row) => {
+                    const state = getResultReviewState(row);
 
-                  return (
-                    <tr
-                      key={row.id}
-                      onClick={() => setSelectedRowId(row.id)}
-                      className={cn(
-                        "h-12 cursor-pointer border-b border-hairline-soft border-l-4 text-charcoal transition-colors",
-                        selectedRowId === row.id && "outline outline-2 outline-offset-[-2px] outline-ink",
-                        state === "review"
-                          ? "border-l-status-review bg-status-review-soft"
-                          : "border-l-status-done bg-status-done-soft",
-                      )}
-                    >
-                      <td
+                    return (
+                      <tr
+                        key={row.id}
+                        onClick={() => setSelectedRowId(row.id)}
                         className={cn(
-                          "sticky left-0 z-10 whitespace-nowrap px-4 py-3",
-                          state === "review" ? "bg-status-review-soft" : "bg-status-done-soft",
+                          "h-12 cursor-pointer border-b border-hairline-soft border-l-4 text-charcoal transition-colors",
+                          selectedRowId === row.id && "outline outline-2 outline-offset-[-2px] outline-ink",
+                          state === "review"
+                            ? "border-l-status-review bg-status-review-soft"
+                            : "border-l-status-done bg-status-done-soft",
                         )}
                       >
-                        <button
-                          type="button"
-                          className="inline-flex min-h-11 items-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            const nextState = state === "review" ? "done" : "review";
-                            void saveRowPatch(row.id, buildReviewStatePatch(nextState));
-                          }}
+                        <td
+                          className={cn(
+                            "sticky left-0 z-10 whitespace-nowrap px-4 py-3",
+                            state === "review" ? "bg-status-review-soft" : "bg-status-done-soft",
+                          )}
                         >
-                          <ResultStatusBadge row={row} />
-                        </button>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-slate">{row.rowIndex}</td>
-                      <td className="max-w-[220px] px-4 py-3">
-                        <span className="block truncate">{buildInterviewSummary(row)}</span>
-                      </td>
-                      <td className="max-w-[140px] px-4 py-3">
-                        <EditableCell
-                          field="primaryCause"
-                          row={row}
-                          editingCell={editingCell}
-                          draftValue={draftValue}
-                          onCancel={cancelEditing}
-                          onCommit={commitEditing}
-                          onDraftChange={setDraftValue}
-                          onStartEditing={startEditing}
-                        />
-                      </td>
-                      <td className="max-w-[140px] px-4 py-3">
-                        <EditableCell
-                          field="secondaryAction"
-                          row={row}
-                          editingCell={editingCell}
-                          draftValue={draftValue}
-                          onCancel={cancelEditing}
-                          onCommit={commitEditing}
-                          onDraftChange={setDraftValue}
-                          onStartEditing={startEditing}
-                        />
-                      </td>
-                      <td className="max-w-[140px] px-4 py-3">
-                        <EditableCell
-                          field="detailTags"
-                          row={row}
-                          editingCell={editingCell}
-                          draftValue={draftValue}
-                          onCancel={cancelEditing}
-                          onCommit={commitEditing}
-                          onDraftChange={setDraftValue}
-                          onStartEditing={startEditing}
-                        />
-                      </td>
-                      <td className="max-w-[120px] px-4 py-3">
-                        <span className="block truncate">{displayValue(row.competingCourse)}</span>
-                      </td>
-                      <td className="max-w-[220px] px-4 py-3">
-                        <span className="block truncate">{displayValue(row.reasoning)}</span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                          <button
+                            type="button"
+                            className="inline-flex min-h-11 items-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              const nextState = state === "review" ? "done" : "review";
+                              void saveRowPatch(row.id, buildReviewStatePatch(nextState));
+                            }}
+                          >
+                            <ResultStatusBadge row={row} />
+                          </button>
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-slate">{row.rowIndex}</td>
+                        <td className="max-w-[220px] px-4 py-3">
+                          <span className="block truncate">{buildInterviewSummary(row)}</span>
+                        </td>
+                        <td className="max-w-[140px] px-4 py-3">
+                          <EditableCell
+                            field="primaryCause"
+                            row={row}
+                            editingCell={editingCell}
+                            draftValue={draftValue}
+                            onCancel={cancelEditing}
+                            onCommit={commitEditing}
+                            onDraftChange={setDraftValue}
+                            onStartEditing={startEditing}
+                          />
+                        </td>
+                        <td className="max-w-[140px] px-4 py-3">
+                          <EditableCell
+                            field="secondaryAction"
+                            row={row}
+                            editingCell={editingCell}
+                            draftValue={draftValue}
+                            onCancel={cancelEditing}
+                            onCommit={commitEditing}
+                            onDraftChange={setDraftValue}
+                            onStartEditing={startEditing}
+                          />
+                        </td>
+                        <td className="max-w-[140px] px-4 py-3">
+                          <EditableCell
+                            field="detailTags"
+                            row={row}
+                            editingCell={editingCell}
+                            draftValue={draftValue}
+                            onCancel={cancelEditing}
+                            onCommit={commitEditing}
+                            onDraftChange={setDraftValue}
+                            onStartEditing={startEditing}
+                          />
+                        </td>
+                        <td className="max-w-[120px] px-4 py-3">
+                          <span className="block truncate">{displayValue(row.competingCourse)}</span>
+                        </td>
+                        <td className="max-w-[220px] px-4 py-3">
+                          <span className="block truncate">{displayValue(row.reasoning)}</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <OriginalSourcePanel selectedRow={selectedRow} onClose={() => setSelectedRowId(null)} />
