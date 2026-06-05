@@ -80,9 +80,8 @@ function insightCacheKey(sessionId: string, tab: TabKey) {
 function AiInsightCard({ insight }: { insight: SegmentInsight }) {
   return (
     <div className="rounded-xl border border-hairline bg-white p-5">
-      <div className="mb-3 flex items-center gap-2">
+      <div className="mb-3">
         <span className="text-heading-sub text-ink">📍 {insight.segment}</span>
-        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-caption text-amber-800">AI 추정</span>
       </div>
       <dl className="flex flex-col gap-2.5">
         <div>
