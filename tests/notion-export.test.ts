@@ -75,6 +75,6 @@ test("buildNotionMarkdown includes insight and result table", () => {
 
   assert.match(markdown, /# 취소 사유 분석 결과 - 3기/);
   assert.match(markdown, /내일배움카드 이슈가 가장 많습니다/);
-  assert.match(markdown, /\| 행 \| 1차 원인 \| 2차 행동 \| 세부 태그 \| 검토 여부 \| 판단 근거 \|/);
+  assert.match(markdown, /\| 행 \| 1차 원인 \| 향후 향방 \| 세부 태그 \| 검토 여부 \| 판단 근거 \|/);
   assert.match(markdown, /\| 2 \| 내일배움카드 이슈 \| 카드 발급 안내 \| 발급 지연 \| 완료 \|/);
 });
