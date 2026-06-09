@@ -59,12 +59,13 @@ test("buildClassificationDraft rejects workbooks over 200 data rows", () => {
   );
 });
 
-test("buildBatchRanges returns five-row ranges", () => {
-  assert.equal(CLASSIFICATION_BATCH_SIZE, 5);
+test("buildBatchRanges returns three-row ranges", () => {
+  assert.equal(CLASSIFICATION_BATCH_SIZE, 3);
   assert.deepEqual(buildBatchRanges(12), [
-    { startIndex: 0, endIndex: 5 },
-    { startIndex: 5, endIndex: 10 },
-    { startIndex: 10, endIndex: 12 },
+    { startIndex: 0, endIndex: 3 },
+    { startIndex: 3, endIndex: 6 },
+    { startIndex: 6, endIndex: 9 },
+    { startIndex: 9, endIndex: 12 },
   ]);
 });
 

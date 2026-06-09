@@ -21,7 +21,7 @@ export const ClassifyRowSchema = z.object({
 
 export const ClassifyRequestSchema = z.object({
   sessionId: z.string().min(1),
-  rows: z.array(ClassifyRowSchema).min(1).max(5),
+  rows: z.array(ClassifyRowSchema).min(1).max(3),
 });
 
 export const ClassificationResultSchema = z.object({

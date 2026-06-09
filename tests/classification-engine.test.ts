@@ -24,11 +24,11 @@ const sampleRow = {
   },
 };
 
-test("ClassifyRequestSchema accepts at most five rows", () => {
+test("ClassifyRequestSchema accepts at most three rows", () => {
   assert.equal(
     ClassifyRequestSchema.safeParse({
       sessionId: "session-1",
-      rows: [sampleRow, sampleRow, sampleRow, sampleRow, sampleRow],
+      rows: [sampleRow, sampleRow, sampleRow],
     }).success,
     true,
   );
@@ -36,7 +36,7 @@ test("ClassifyRequestSchema accepts at most five rows", () => {
   assert.equal(
     ClassifyRequestSchema.safeParse({
       sessionId: "session-1",
-      rows: [sampleRow, sampleRow, sampleRow, sampleRow, sampleRow, sampleRow],
+      rows: [sampleRow, sampleRow, sampleRow, sampleRow],
     }).success,
     false,
   );
@@ -150,8 +150,8 @@ test("classifyRows retries once at row layer and then falls back to review", asy
   assert.equal(result.failedCount, 1);
 });
 
-test("classifyRows splits a failed five-row batch and recovers smaller chunks", async () => {
-  const rows = Array.from({ length: 5 }, (_, index) => ({
+test("classifyRows splits a failed three-row batch and recovers smaller chunks", async () => {
+  const rows = Array.from({ length: 3 }, (_, index) => ({
     ...sampleRow,
     rowIndex: index + 2,
   }));
@@ -168,7 +168,7 @@ test("classifyRows splits a failed five-row batch and recovers smaller chunks", 
         rows: Array<{ rowIndex: number }>;
       };
 
-      if (payload.rows.length === 5) {
+      if (payload.rows.length === 3) {
         throw new Error("batch too complex");
       }
 
@@ -191,7 +191,7 @@ test("classifyRows splits a failed five-row batch and recovers smaller chunks", 
   );
 
   assert.equal(calls, 4);
-  assert.equal(result.processedCount, 5);
+  assert.equal(result.processedCount, 3);
   assert.equal(result.failedCount, 0);
   assert.equal(result.reviewCount, 0);
 });
