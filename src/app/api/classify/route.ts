@@ -1,5 +1,6 @@
 import { ApiError, withApiHandler } from "@/lib/api-handler";
 import { runAiJsonRequest } from "@/lib/gpt-client";
+import { readAiProvider } from "@/shared/env/server";
 import { getSupabaseServerClient } from "@/shared/supabase/server";
 import {
   buildClassificationResultInsertPayloads,
@@ -8,9 +9,14 @@ import {
   classifyRows,
 } from "@/classify/classification-engine";
 
+function elapsedMilliseconds(start: number) {
+  return Math.round(performance.now() - start);
+}
+
 export async function POST(request: Request) {
   return withApiHandler(
     async () => {
+      const totalStart = performance.now();
       const rawBody: unknown = await request.json();
       const parsed = ClassifyRequestSchema.safeParse(rawBody);
 
@@ -18,7 +24,24 @@ export async function POST(request: Request) {
         throw new ApiError("분류 요청 형식이 올바르지 않습니다.", 400);
       }
 
-      const classification = await classifyRows(parsed.data, runAiJsonRequest);
+      const provider = readAiProvider();
+      let promptBytes = 0;
+      let aiMs = 0;
+      const classification = await classifyRows(parsed.data, async (input) => {
+        promptBytes += Buffer.byteLength(input, "utf8");
+        const aiStart = performance.now();
+        try {
+          return await runAiJsonRequest(input, {
+            retryOptions: {
+              factor: 2,
+              maxTimeout: 2000,
+              minTimeout: 500,
+            },
+          });
+        } finally {
+          aiMs += elapsedMilliseconds(aiStart);
+        }
+      });
       const supabase = getSupabaseServerClient();
       const resultPayloads = buildClassificationResultInsertPayloads(
         parsed.data.sessionId,
@@ -26,6 +49,7 @@ export async function POST(request: Request) {
         parsed.data.rows,
       );
 
+      const dbStart = performance.now();
       const { error: resultError } = await supabase.from("classification_results").insert(resultPayloads as never);
 
       if (resultError) {
@@ -44,7 +68,21 @@ export async function POST(request: Request) {
         }
       }
 
+      console.info("classification.batch.completed", {
+        aiMs,
+        dbMs: elapsedMilliseconds(dbStart),
+        event: "classification.batch.completed",
+        failedCount: classification.failedCount,
+        promptBytes,
+        provider,
+        reviewCount: classification.reviewCount,
+        rowCount: parsed.data.rows.length,
+        sessionId: parsed.data.sessionId,
+        totalMs: elapsedMilliseconds(totalStart),
+      });
+
       return {
+        failedCount: classification.failedCount,
         processedCount: classification.processedCount,
         reviewCount: classification.reviewCount,
       };

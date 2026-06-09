@@ -40,6 +40,7 @@ import { CLASSIFICATION_DRAFT_STORAGE_KEY, type ClassificationDraft } from "@/sh
 import { SESSION_ID_STORAGE_KEY } from "@/shared/session/session-guard";
 
 interface BatchClassificationResponse {
+  failedCount?: number;
   processedCount?: number;
   reviewCount?: number;
   error?: string;
@@ -113,7 +114,7 @@ export function AnalyzingWorkspace() {
           }
 
           nextCompletedRows += payload.processedCount ?? batchLength;
-          nextFailedRows += payload.reviewCount ?? 0;
+          nextFailedRows += payload.failedCount ?? 0;
           totalReviewCount += payload.reviewCount ?? 0;
         } catch (error) {
           console.error("Classification batch failed:", error);
