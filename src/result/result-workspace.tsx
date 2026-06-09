@@ -31,6 +31,10 @@ import {
   type EditableResultField,
   type ResultRowPatch,
 } from "@/result/result-update";
+import {
+  buildMissedOpportunitySummary,
+  judgeMissedOpportunity,
+} from "@/result/missed-opportunity";
 
 interface ResultSessionPayload {
   id: string;
@@ -182,6 +186,7 @@ export function ResultWorkspace() {
   const { toast } = useToast();
 
   const summary = useMemo(() => calculateResultSummary(rows), [rows]);
+  const missedSummary = useMemo(() => buildMissedOpportunitySummary(rows), [rows]);
   const selectedRow = useMemo(() => rows.find((row) => row.id === selectedRowId) ?? null, [rows, selectedRowId]);
   const insight = useMemo(() => parseStoredInsightSummary(data?.session.insight_summary ?? null), [data?.session.insight_summary]);
   const tagsByPrimaryCause = useMemo(() => buildTagsByPrimaryCause(rows), [rows]);
@@ -389,6 +394,12 @@ export function ResultWorkspace() {
             <p className="text-caption text-slate">
               총 {summary.totalCount}건 분류 완료 · 검토 필요 {summary.reviewCount}건
             </p>
+            <p className="text-caption text-amber-700">
+              🟡 이번 기수에 잡을 가능성이 있었던(노란불) 사람은 {missedSummary.missedCount}명입니다.
+              {missedSummary.reviewPendingCount > 0
+                ? ` (검토 필요 ${missedSummary.reviewPendingCount}건은 판정 보류)`
+                : ""}
+            </p>
           </div>
           <Button
             type="button"
@@ -423,7 +434,7 @@ export function ResultWorkspace() {
                     <th className="px-4 py-3 font-medium">행</th>
                     <th className="px-4 py-3 font-medium">인터뷰 내용</th>
                     <th className="px-4 py-3 font-medium">1차 원인</th>
-                    <th className="px-4 py-3 font-medium">2차 행동</th>
+                    <th className="px-4 py-3 font-medium">향후 향방</th>
                     <th className="px-4 py-3 font-medium">세부 태그</th>
                     <th className="px-4 py-3 font-medium">타 과정명</th>
                     <th className="px-4 py-3 font-medium">판단 근거</th>
@@ -490,6 +501,11 @@ export function ResultWorkspace() {
                             onDraftChange={setDraftValue}
                             onStartEditing={startEditing}
                           />
+                          {judgeMissedOpportunity(row) === "노란불" ? (
+                            <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+                              🟡 노란불
+                            </span>
+                          ) : null}
                         </td>
                         <td className="max-w-[140px] px-4 py-3">
                           <EditableCell
@@ -581,16 +597,16 @@ export function ResultWorkspace() {
             )}
           </div>
 
-          {/* E: 2차 행동 + 타 과정 — 보조 정보 */}
+          {/* E: 향후 향방 + 타 과정 — 보조 정보 */}
           <div className={cn("grid gap-4", insight.competingCourses.length > 0 ? "lg:grid-cols-2" : "")}>
             <div className="rounded-xl border border-hairline bg-white p-5">
-              <p className="mb-3 text-badge text-slate">2차 행동</p>
+              <p className="mb-3 text-badge text-slate">향후 향방</p>
               {insight.topSecondaryActions.length > 0 ? (
                 <div className="overflow-hidden rounded-xl border border-hairline">
                   <table className="min-w-full border-collapse text-body">
                     <thead className="bg-surface">
                       <tr>
-                        <th className="px-4 py-2 text-left text-caption text-slate">행동</th>
+                        <th className="px-4 py-2 text-left text-caption text-slate">향후 행동</th>
                         <th className="px-4 py-2 text-right text-caption text-slate">건수</th>
                         <th className="px-4 py-2 text-right text-caption text-slate">비율</th>
                       </tr>

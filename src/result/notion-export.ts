@@ -161,7 +161,7 @@ export function buildNotionMarkdown({
     buildComparisonMarkdown(insight),
     "",
     "## 분류 결과",
-    "| 행 | 1차 원인 | 2차 행동 | 세부 태그 | 검토 여부 | 판단 근거 |",
+    "| 행 | 1차 원인 | 향후 향방 | 세부 태그 | 검토 여부 | 판단 근거 |",
     "| --- | --- | --- | --- | --- | --- |",
     tableRows,
   ].join("\n");
