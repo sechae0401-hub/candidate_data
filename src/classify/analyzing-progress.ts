@@ -1,7 +1,7 @@
-export const CLASSIFICATION_BATCH_SIZE = 3;
+export const CLASSIFICATION_BATCH_SIZE = 5;
 // 동시에 처리하는 배치 수. 완료되는 즉시 다음 배치를 투입하는 동시성 풀에서 사용한다.
 // 값이 클수록 빠르지만 OpenAI 분당 요청 한도(RPM)에 가까워질 수 있다.
-export const PARALLEL_BATCH_COUNT = 8;
+export const PARALLEL_BATCH_COUNT = 4;
 
 export const INSIGHT_LOADING_MESSAGE =
   "취소 이유들을 한데 모아 흐름을 읽는 중입니다. 잠깐만요... 🧩";
@@ -67,12 +67,11 @@ export function buildReviewNotice(reviewRowCount: number) {
 
 export function hasFullClassificationFailure({
   totalRows,
-  completedRows,
   failedRows,
 }: {
   totalRows: number;
   completedRows: number;
   failedRows: number;
 }) {
-  return totalRows > 0 && completedRows === 0 && failedRows >= totalRows;
+  return totalRows > 0 && failedRows >= totalRows;
 }

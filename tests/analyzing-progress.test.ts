@@ -59,12 +59,12 @@ test("buildClassificationDraft rejects workbooks over 200 data rows", () => {
   );
 });
 
-test("buildBatchRanges returns three-row ranges", () => {
-  assert.equal(CLASSIFICATION_BATCH_SIZE, 3);
-  assert.deepEqual(buildBatchRanges(7), [
-    { startIndex: 0, endIndex: 3 },
-    { startIndex: 3, endIndex: 6 },
-    { startIndex: 6, endIndex: 7 },
+test("buildBatchRanges returns five-row ranges", () => {
+  assert.equal(CLASSIFICATION_BATCH_SIZE, 5);
+  assert.deepEqual(buildBatchRanges(12), [
+    { startIndex: 0, endIndex: 5 },
+    { startIndex: 5, endIndex: 10 },
+    { startIndex: 10, endIndex: 12 },
   ]);
 });
 
@@ -79,4 +79,6 @@ test("analyzing labels and failure notices are stable", () => {
   assert.equal(getAnalyzingStageLabel("insight"), "인사이트 요약 생성 중");
   assert.equal(buildReviewNotice(3), "3건 검토 필요로 처리됨, 계속 진행 중");
   assert.equal(hasFullClassificationFailure({ totalRows: 6, completedRows: 0, failedRows: 6 }), true);
+  assert.equal(hasFullClassificationFailure({ totalRows: 6, completedRows: 6, failedRows: 6 }), true);
+  assert.equal(hasFullClassificationFailure({ totalRows: 6, completedRows: 6, failedRows: 0 }), false);
 });
